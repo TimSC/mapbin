@@ -13,15 +13,19 @@ def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 
 	compfile = compressedfile.CompressedFile(fina)
 	compfile.maxCachePages = maxCachedPages
-	nodeStartTable = hashtable.HashTableFile(compfile, maskBits, 1)
-	return nodeStartTable
+	table = hashtable.HashTableFile(compfile, maskBits, 1)
+	table.hashGradient = 1
+	table.hashOffset = 10000
+	return table, compfile
 
 def StoreFactoryRead(fina, maxCachedPages = 50):
 
 	compfile = compressedfile.CompressedFile(fina)
 	compfile.maxCachePages = maxCachedPages
-	nodeStartTable = hashtable.HashTableFile(compfile, maskBits, 0)
-	return nodeStartTable
+	table = hashtable.HashTableFile(compfile, None, 0)
+	table.hashGradient = 1
+	table.hashOffset = 10000
+	return table, compfile
 
 class TagIndex(object):
 
@@ -34,16 +38,16 @@ class TagIndex(object):
 		self.lastDisplayCount = 0
 
 		print "Create node tables"
-		self.nodeStartTable = StoreFactoryCreate("nodestart.hash", 26, 500)
-		self.nodeEndTable = StoreFactoryCreate("nodeend.hash", 26, 500)
+		self.nodeStartTable, self.nodeStartFile = StoreFactoryCreate("nodestart.hash", 26, 5000)
+		self.nodeEndTable, self.nodeEndFile = StoreFactoryCreate("nodeend.hash", 26, 5000)
 
 		print "Create way tables"
-		self.wayStartTable = StoreFactoryCreate("waystart.hash", 23)
-		self.wayEndTable = StoreFactoryCreate("wayend.hash", 23)
+		self.wayStartTable, self.wayStartFile = StoreFactoryCreate("waystart.hash", 23, 500)
+		self.wayEndTable, self.wayEndFile = StoreFactoryCreate("wayend.hash", 23, 500)
 
 		print "Create relation tables"
-		self.relationStartTable = StoreFactoryCreate("relationstart.hash", 17)
-		self.relationEndTable = StoreFactoryCreate("relationend.hash", 17)
+		self.relationStartTable, self.relationStartFile = StoreFactoryCreate("relationstart.hash", 17, 500)
+		self.relationEndTable, self.relationEndFile = StoreFactoryCreate("relationend.hash", 17, 500)
 
 		self.nodeStartTable.verbose = 0
 		self.nodeEndTable.verbose = 0
@@ -72,15 +76,30 @@ class TagIndex(object):
 		#self.nodeStartTable.allocate_mask_size(21)
 		#self.nodeEndTable.allocate_mask_size(21)
 
+	def __del__(self):
+		print "Flushing"
+		del self.nodeStartTable
+		del self.nodeEndTable
+
+		del self.wayStartTable
+		del self.wayEndTable
+
+		del self.relationStartTable
+		del self.relationEndTable
+
 	def TagLimitCallback(self, name, depth, attr, start, end):
 		if depth != 2:
 			return
 
-		if self.objs % 1000 == 0:
+		if time.time() - self.lastDisplayTime > 1.:
 			rate = (self.objs - self.lastDisplayCount) / (time.time() - self.lastDisplayTime)
 			self.lastDisplayCount = self.objs
 			self.lastDisplayTime = time.time()
 			print self.nodes, self.ways, self.relations, self.objs, "("+str(rate)+" obj per sec)"
+		
+			if 1:
+				print "page reads", self.nodeStartFile.cacheReads, self.nodeStartFile.diskReads
+				print "page writes", self.nodeStartFile.cacheWrites, self.nodeStartFile.diskWrites
 
 		self.objs += 1
 
@@ -126,4 +145,7 @@ if __name__ == "__main__":
 	#print tagIndex.nodeStartTable.hashMask
 
 	print tagIndex.nodes, tagIndex.ways, tagIndex.relations, tagIndex.objs
+
+	del tagIndex
+	del parser
 
