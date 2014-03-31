@@ -1,0 +1,3 @@
+[submodule "pycontainers"]
+	path = pycontainers
+	url = https://github.com/TimSC/pycontainers.git
