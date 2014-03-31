@@ -1,7 +1,42 @@
 import xml.parsers.expat as expat
 from xml.sax.saxutils import escape, quoteattr
 
-class ExpatParse(object):
+class ReadXml(object):
+	def __init__(self):
+		self.parser = expat.ParserCreate()
+		self.parser.CharacterDataHandler = self.HandleCharData
+		self.parser.StartElementHandler = self.HandleStartElement
+		self.parser.EndElementHandler = self.HandleEndElement
+		self.depth = 0
+		self.maxDepth = 0
+		self.tags = []
+		self.attr = []
+		self.TagLimitCallback = None
+
+	def ParseFile(self, fi):
+		fi.seek(0)
+		self.fiTmp = fi
+		self.parser.ParseFile(fi)
+
+	def HandleCharData(self, data):
+		pass
+
+	def HandleStartElement(self, name, attrs):
+		self.depth += 1
+		self.maxDepth = self.depth
+		self.tags.append(name)
+		self.attr.append(attrs)
+
+	def HandleEndElement(self, name): 
+
+		if self.TagLimitCallback is not None:
+			self.TagLimitCallback(name, self.depth, self.attr[-1])
+
+		self.depth -= 1
+		self.tags.pop()
+		self.attr.pop()
+
+class RewriteXml(object):
 	def __init__(self, outFi):
 		self.parser = expat.ParserCreate()
 		self.parser.CharacterDataHandler = self.HandleCharData

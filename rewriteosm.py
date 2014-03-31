@@ -1,6 +1,6 @@
 
 import bz2, sys, os, time
-import rewritexml
+import xmlprocessing
 from pycontainers import compressedfile, hashtable
 
 #UK dump size nodes=33017987 ways=4040979 relations=80851
@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
 	tagIndex = TagIndex()
 
-	parser = rewritexml.ExpatParse(outfi)
+	parser = xmlprocessing.RewriteXml(outfi)
 	parser.TagLimitCallback = tagIndex.TagLimitCallback
 	parser.ParseFile(infi)
 
@@ -148,4 +148,6 @@ if __name__ == "__main__":
 
 	del tagIndex
 	del parser
+
+	print "All done"
 
