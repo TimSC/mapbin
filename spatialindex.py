@@ -22,21 +22,16 @@ class TileStorage(object):
 			self.outFileSystem.mkdir("/"+str(i))
 
 		self.handleCache = {}
+		self.handleAccessTime = {}
 
 	def Add(self, lat, lon, objId, version):
 		self.RecusiveZoomAdd(self.minZoom, lat, lon, objId, version)
 
 	def Open(self, currentZoom, tilex, tiley):
 		datFilename = "/{0}/{1}/{2}.dat".format(currentZoom, tilex, tiley)
-
-		if currentZoom not in self.handleCache:
-			self.handleCache[currentZoom] = {}
-		zoomCache = self.handleCache[currentZoom]
-		if tilex not in zoomCache:
-			zoomCache[tilex] = {}
-		colCache = zoomCache[tilex]
-		if tiley in colCache:
-			return colCache[tiley]
+		if datFilename in self.handleCache:
+			self.handleAccessTime[datFilename] = time.time()
+			return self.handleCache[datFilename]
 
 		try:
 			fi = self.outFileSystem.open(datFilename, "a+")
@@ -46,8 +41,20 @@ class TileStorage(object):
 				self.outFileSystem.mkdir(folderName)
 			fi = self.outFileSystem.open(datFilename, "a+")
 			
-		colCache[tiley] = fi
-		print len(colCache)
+		self.handleCache[datFilename] = fi
+		self.handleAccessTime[datFilename] = time.time()
+
+		#Discard old handles
+		if len(self.handleCache) > 1000:
+			sortableList = zip(self.handleAccessTime.values(), self.handleAccessTime.keys())
+			sortableList.sort()
+			print sortableList
+
+			cutPoint = len(sortableList) / 10
+			for ti, fina in sortableList[:cutPoint]:
+				del self.handleAccessTime[fina]
+				del self.handleCache[fina]
+
 		return fi
 	
 	def RecusiveZoomAdd(self, currentZoom, lat, lon, objId, version):
@@ -123,9 +130,9 @@ if __name__ == "__main__":
 		pass
 
 	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(sys.argv[2]), initFs = 1, 
-		deviceSize = 1000 * 1024 * 1024, 
+		deviceSize = 10000 * 1024 * 1024, 
 		maxFileSize = 1 * 1024 * 1024,
-		blockSize = 1024 * 1024)
+		blockSize = 100 * 1024)
 	print outFileSystem.statvfs("/")
 
 	tileStorage = TileStorage(outFileSystem)
