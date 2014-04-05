@@ -47,6 +47,7 @@ class TileStorage(object):
 			fi = self.outFileSystem.open(datFilename, "a+")
 			
 		colCache[tiley] = fi
+		print len(colCache)
 		return fi
 	
 	def RecusiveZoomAdd(self, currentZoom, lat, lon, objId, version):
