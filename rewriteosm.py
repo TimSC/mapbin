@@ -13,18 +13,14 @@ def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 
 	compfile = compressedfile.CompressedFile(fina)
 	compfile.maxCachePages = maxCachedPages
-	table = hashtable.HashTableFile(compfile, maskBits, 1)
-	table.hashGradient = 1
-	table.hashOffset = 10000
+	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000)
 	return table, compfile
 
 def StoreFactoryRead(fina, maxCachedPages = 50):
 
 	compfile = compressedfile.CompressedFile(fina)
 	compfile.maxCachePages = maxCachedPages
-	table = hashtable.HashTableFile(compfile, None, 0)
-	table.hashGradient = 1
-	table.hashOffset = 10000
+	table = hashtable.HashTableFile(compfile, None, 0, 1, 1, 10000)
 	return table, compfile
 
 class TagIndex(object):
@@ -51,14 +47,6 @@ class TagIndex(object):
 
 		self.nodeStartTable.verbose = 0
 		self.nodeEndTable.verbose = 0
-		self.nodeStartTable.modulusIntHash = 1
-		self.nodeEndTable.modulusIntHash = 1
-
-		self.wayStartTable.modulusIntHash = 1
-		self.wayEndTable.modulusIntHash = 1
-
-		self.relationStartTable.modulusIntHash = 1
-		self.relationEndTable.modulusIntHash = 1
 
 		if 0:
 			print "Clear node hashes"
