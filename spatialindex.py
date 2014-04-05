@@ -15,9 +15,10 @@ def deg2num(lat_deg, lon_deg, zoom):
 class TileStorage(object):
 	def __init__(self, outFileSystem):
 		self.outFileSystem = outFileSystem
-		self.minZoom = 14
-		self.maxZoom = 14
-		self.entry = struct.Struct(">ffQI")
+		self.minZoom = 11
+		self.maxZoom = 11
+		#self.entry = struct.Struct(">ffQI")
+		self.entry = struct.Struct(">QI")
 		for i in range(self.maxZoom+1):
 			self.outFileSystem.mkdir("/"+str(i))
 
@@ -45,10 +46,9 @@ class TileStorage(object):
 		self.handleAccessTime[datFilename] = time.time()
 
 		#Discard old handles
-		if len(self.handleCache) > 1000:
+		if len(self.handleCache) > 100000:
 			sortableList = zip(self.handleAccessTime.values(), self.handleAccessTime.keys())
 			sortableList.sort()
-			print sortableList
 
 			cutPoint = len(sortableList) / 10
 			for ti, fina in sortableList[:cutPoint]:
@@ -68,7 +68,7 @@ class TileStorage(object):
 		#	return
 
 		fi = self.Open(currentZoom, tilex, tiley)
-		fi.write(self.entry.pack(lat, lon, objId, version))
+		fi.write(self.entry.pack(objId, version))
 		numEntries = len(fi) / self.entry.size
 		#print lat, lon, currentZoom, numEntries
 		#if numEntries >= 100 and currentZoom < self.maxZoom:
@@ -132,7 +132,8 @@ if __name__ == "__main__":
 	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(sys.argv[2]), initFs = 1, 
 		deviceSize = 10000 * 1024 * 1024, 
 		maxFileSize = 1 * 1024 * 1024,
-		blockSize = 100 * 1024)
+		blockSize = 100 * 1024,
+		maxFiles = 5000000)
 	print outFileSystem.statvfs("/")
 
 	tileStorage = TileStorage(outFileSystem)
