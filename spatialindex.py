@@ -15,13 +15,56 @@ def deg2num(lat_deg, lon_deg, zoom):
 class TileStorage(object):
 	def __init__(self, outFileSystem):
 		self.outFileSystem = outFileSystem
+		self.minZoom = 14
+		self.maxZoom = 14
+		self.entry = struct.Struct(">ffQI")
+		for i in range(self.maxZoom+1):
+			self.outFileSystem.mkdir("/"+str(i))
+
+		self.handleCache = {}
+
 	def Add(self, lat, lon, objId, version):
-		startZoom = 0
+		self.RecusiveZoomAdd(self.minZoom, lat, lon, objId, version)
+
+	def Open(self, currentZoom, tilex, tiley):
+		datFilename = "/{0}/{1}/{2}.dat".format(currentZoom, tilex, tiley)
+
+		if currentZoom not in self.handleCache:
+			self.handleCache[currentZoom] = {}
+		zoomCache = self.handleCache[currentZoom]
+		if tilex not in zoomCache:
+			zoomCache[tilex] = {}
+		colCache = zoomCache[tilex]
+		if tiley in colCache:
+			return colCache[tiley]
+
+		try:
+			fi = self.outFileSystem.open(datFilename, "a+")
+		except:
+			folderName = "/{0}/{1}".format(currentZoom, tilex)
+			if not self.outFileSystem.exists(folderName):
+				self.outFileSystem.mkdir(folderName)
+			fi = self.outFileSystem.open(datFilename, "a+")
+			
+		colCache[tiley] = fi
+		return fi
+	
+	def RecusiveZoomAdd(self, currentZoom, lat, lon, objId, version):
 		
-		filename = "zero"
-		self.fi = self.outFileSystem.open(filename, "a")
-		self.fi.write(struct.pack(">ffQI", lat, lon, objId, version))
-		
+		tilex, tiley = deg2num(lat, lon, currentZoom)
+		#print lat, lon, tilex, tiley
+
+		#fullFile = "/{0}/{1}/{2}.full".format(currentZoom, tilex, tiley)
+		#if self.outFileSystem.exists(fullFile) and currentZoom < self.maxZoom:
+		#	self.RecusiveZoomAdd(currentZoom + 1, lat, lon, objId, version)
+		#	return
+
+		fi = self.Open(currentZoom, tilex, tiley)
+		fi.write(self.entry.pack(lat, lon, objId, version))
+		numEntries = len(fi) / self.entry.size
+		#print lat, lon, currentZoom, numEntries
+		#if numEntries >= 100 and currentZoom < self.maxZoom:
+		#	self.outFileSystem.open(fullFile, "w")
 
 class TagIndex(object):
 
@@ -79,7 +122,7 @@ if __name__ == "__main__":
 		pass
 
 	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(sys.argv[2]), initFs = 1, 
-		deviceSize = 100 * 1024 * 1024, 
+		deviceSize = 1000 * 1024 * 1024, 
 		maxFileSize = 1 * 1024 * 1024,
 		blockSize = 1024 * 1024)
 	print outFileSystem.statvfs("/")
