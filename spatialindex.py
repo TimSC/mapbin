@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
 	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(sys.argv[2]), initFs = 1, 
 		deviceSize = 10000 * 1024 * 1024, 
-		maxFileSize = 1 * 1024 * 1024,
+		maxFileSize = 10 * 1024 * 1024,
 		blockSize = 100 * 1024,
 		maxFiles = 5000000)
 	print outFileSystem.statvfs("/")
