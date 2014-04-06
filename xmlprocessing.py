@@ -11,6 +11,8 @@ class ReadXml(object):
 		self.maxDepth = 0
 		self.tags = []
 		self.attr = []
+		self.childTags = {}
+		self.childMembers = []
 		self.TagLimitCallback = None
 
 	def ParseFile(self, fi):
@@ -27,10 +29,22 @@ class ReadXml(object):
 		self.tags.append(name)
 		self.attr.append(attrs)
 
+		if self.depth == 3:
+			if name == "tag":
+				self.childTags[attrs['k']] = attrs['v']
+			if name == "nd":
+				self.childMembers.append(("node", attrs['ref'], None))
+			if name == "member":
+				self.childMembers.append((attrs['type'], int(attrs['ref']), attrs['role']))
+
 	def HandleEndElement(self, name): 
 
 		if self.TagLimitCallback is not None:
-			self.TagLimitCallback(name, self.depth, self.attr[-1])
+			self.TagLimitCallback(name, self.depth, self.attr[-1], self.childTags, self.childMembers)
+
+		if self.depth <= 2:
+			self.childTags = {}
+			self.childMembers = []
 
 		self.depth -= 1
 		self.tags.pop()

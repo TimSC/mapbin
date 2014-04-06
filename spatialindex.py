@@ -88,7 +88,7 @@ class TagIndex(object):
 	def __del__(self):
 		print "Flushing"
 
-	def TagLimitCallback(self, name, depth, attr):
+	def TagLimitCallback(self, name, depth, attr, childTags, childMembers):
 		if depth != 2:
 			return
 
