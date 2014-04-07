@@ -33,7 +33,7 @@ class ReadXml(object):
 			if name == "tag":
 				self.childTags[attrs['k']] = attrs['v']
 			if name == "nd":
-				self.childMembers.append(("node", attrs['ref'], None))
+				self.childMembers.append(("node", int(attrs['ref']), None))
 			if name == "member":
 				self.childMembers.append((attrs['type'], int(attrs['ref']), attrs['role']))
 
