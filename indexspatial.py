@@ -1,16 +1,9 @@
 
 import bz2, sys, os, time, math, struct
-import xmlprocessing
+import xmlprocessing, slippy
 from pycontainers import compressedfile, qsfs
 
 #UK dump size nodes=33017987 ways=4040979 relations=80851
-
-def deg2num(lat_deg, lon_deg, zoom):
-	lat_rad = math.radians(lat_deg)
-	n = 2.0 ** zoom
-	xtile = int((lon_deg + 180.0) / 360.0 * n)
-	ytile = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n)
-	return (xtile, ytile)
 
 class TileStorage(object):
 	def __init__(self, outFileSystem):
@@ -59,7 +52,7 @@ class TileStorage(object):
 	
 	def RecusiveZoomAdd(self, currentZoom, lat, lon, objId, version):
 		
-		tilex, tiley = deg2num(lat, lon, currentZoom)
+		tilex, tiley = slippy.deg2num(lat, lon, currentZoom)
 		#print lat, lon, tilex, tiley
 
 		#fullFile = "/{0}/{1}/{2}.full".format(currentZoom, tilex, tiley)
@@ -151,6 +144,6 @@ if __name__ == "__main__":
 
 	del tagIndex
 	del parser
-
+	outFileSystem.flush()
 	print "All done"
 
