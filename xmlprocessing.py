@@ -94,18 +94,21 @@ class RewriteXml(object):
 			strFrag.append(">")
 			openTag = "".join(strFrag)
 
-			self.pos += len(openTag)
+			encodedOpenTag = openTag.encode("utf-8")
+			self.pos += len(encodedOpenTag)
 			if self.outFi is not None:
-				self.outFi.write(openTag.encode("utf-8"))
+				self.outFi.write(encodedOpenTag)
 
 	def HandleEndElement(self, name): 
 
 		if not self.parseOnly:
 			closeTag = "</"+name+">\n"
-			self.pos += len(closeTag)
+			closeTagEncoded = closeTag.encode("utf-8")
+
+			self.pos += len(closeTagEncoded)
 		
 			if self.outFi is not None:
-				self.outFi.write(closeTag.encode("utf-8"))
+				self.outFi.write(closeTagEncoded)
 
 		if self.TagLimitCallback is not None:
 			self.TagLimitCallback(name, self.depth, self.attr[-1], self.tagStarts[-1], self.pos)

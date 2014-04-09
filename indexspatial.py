@@ -61,7 +61,10 @@ class TileStorage(object):
 		#	return
 
 		fi = self.Open(currentZoom, tilex, tiley)
-		fi.write(self.entry.pack(objId, version))
+		objIdInt = int(objId)
+		if objIdInt == 0:
+			print "Warning: adding a zero objId"
+		fi.write(self.entry.pack(objIdInt, version))
 		numEntries = len(fi) / self.entry.size
 		#print lat, lon, currentZoom, numEntries
 		#if numEntries >= 100 and currentZoom < self.maxZoom:
