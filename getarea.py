@@ -35,11 +35,9 @@ class OsmObjectStore(object):
 		self.mainData.seek(startPos)
 		return self.mainData.read(endPos - startPos)
 
-if __name__=="__main__":
-	
-	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial"))
 
-	queryArea = [-0.5142975,51.2413932,-0.4645157,51.2738368] #left,bottom,right,top
+def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, nodeVersions):
+
 	zoomLevel = 11
 
 	#Determine which data tiles to check for query
@@ -72,8 +70,9 @@ if __name__=="__main__":
 					if nodeVer > candidateNodes[nodeId]:
 						candidateNodes[nodeId] = nodeVer
 
+	print "Checking for latest versions"
+
 	#Check these are the latest known version of the node
-	nodeVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vnode"), readOnly = True)
 	currentNodes = {}
 	for nodeId in candidateNodes:
 		try:
@@ -88,24 +87,51 @@ if __name__=="__main__":
 	print "Num candidate nodes", len(currentNodes)
 
 	#Filter to find those in bounding box
-	osmObjectStore = OsmObjectStore("ukdump")	
+	print "Filtering nodes based on area"
+	
+	nodeInfo = {}
 	for nodeId in currentNodes:
 		objStr = osmObjectStore.Get("node", nodeId, currentNodes[nodeId])
-		print nodeId, "'"+objStr+"'"
-		print len(objStr)
+		#print nodeId, "'"+objStr+"'"
+		#print len(objStr)
 		nodeXmlTree = ET.fromstring("<?xml version='1.0' encoding='UTF-8'?>\n"+objStr)
-		nodeXmlRoot = nodeXmlTree.getroot()
-		print nodeXmlRoot.attrib
+
+		lat = float(nodeXmlTree.attrib['lat'])
+		lon = float(nodeXmlTree.attrib['lon'])
+		
+		if lat < queryArea[1] or lat > queryArea[3]:
+			continue
+		if lon < queryArea[0] or lon > queryArea[2]:
+			continue
+
+		nodeInfo[nodeId] = objStr
 
 	#print spatialIndex.listdir("/11/1022")
+
+	print "Num nodes in area", len(nodeInfo)
+	
+	return nodeInfo
+
+if __name__=="__main__":
+	
+	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial"))
+
+	queryArea = [-0.5142975,51.2413932,-0.4645157,51.2738368] #left,bottom,right,top
+
+	osmObjectStore = OsmObjectStore("ukdump2")
+	nodeVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vnode"), readOnly = True)
+
+	nodesInArea = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, nodeVersions)
 
 	print "Close spatial index"
 	del spatialIndex
 
-	print "Close node versions"
+	print "Close object storage"
+	del osmObjectStore
+
+	print "Close version index"
 	del nodeVersions
-	
-	
 
 	print "All done"
 
+ 
