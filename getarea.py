@@ -52,11 +52,15 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 
 	#Get candidate nodes from spatial index
 	candidateNodes = {}
+	tileHits = 0
+	tileCount = 0
 	for tilex in xr:
 		for tiley in yr:
 			tileFina = "/{0}/{1}/{2}.dat".format(zoomLevel, tilex, tiley)
+			tileCount += 1
 			if not spatialIndex.exists(tileFina):
 				continue
+			tileHits += 1
 			print tilex, tiley
 			fi = spatialIndex.open(tileFina)
 			numNodeEntries = len(fi) / nodeEntry.size
@@ -124,11 +128,15 @@ def GetNodesInSlippyTile(spatialIndex, queryArea, osmObjectStore, versionStore):
 
 	#Get candidate nodes from spatial index
 	candidateNodes = {}
+	tileHits = 0
+	tileCount = 0
 	for tilex in xr:
 		for tiley in yr:
 			tileFina = "/{0}/{1}/{2}.dat".format(zoomLevel, tilex, tiley)
+			tileCount += 1
 			if not spatialIndex.exists(tileFina):
 				continue
+			tileHits += 1
 			print tilex, tiley
 			fi = spatialIndex.open(tileFina)
 			numNodeEntries = len(fi) / nodeEntry.size
@@ -262,137 +270,146 @@ def GetDataForObjs(objsOfInterest, versionStore, osmObjectStore):
 			except IndexError as err: 
 				print "Missing", objType, objId, err
 
+class GetArea(object):
+	def __init__(self):
+		self.spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial", readOnly = True))
+		self.osmObjectStore = OsmObjectStore("ukdump2")
+		self.versionStore = VersionStore()
+		self.parentsStore = ParentsStore()
+		self.currentParentStore = CurrentParentStore(self.versionStore, self.parentsStore)
+
+	def __del__(self):
+		del self.currentParentStore
+
+		print "Close spatial index"
+		del self.spatialIndex
+
+		print "Close object storage"
+		del self.osmObjectStore
+
+		print "Close version index"
+		del self.versionStore
+
+		print "Close parent index"
+		del self.parentsStore
+
+		print "All done"
+
+	def GetArea(self, queryArea, out):
+		
+		nodesOfInterest = GetNodesInCustomArea(self.spatialIndex, queryArea, self.osmObjectStore, self.versionStore)
+		self.NodesToCompleteData(nodesOfInterest, queryArea, out)
+
+	def GetTile(self, tilex, tiley, zoom, out):
+		tileNum = (zoom, tilex, tiley)
+		nw = slippy.num2deg(tilex, tiley, zoom)
+		se = slippy.num2deg(tilex+1, tiley+1, zoom)
+		queryArea = [nw[1], nw[0], se[1], se[0]]
+		nodesOfInterest = GetNodesInSlippyTile(self.spatialIndex, tileNum, self.osmObjectStore, self.versionStore)
+		self.NodesToCompleteData(nodesOfInterest, queryArea, out)
+
+	def NodesToCompleteData(self, nodesOfInterest, queryArea, out):
+
+		#Get parents of objects
+		print "Get parents of objects"
+
+		newObjsOfInterest = {'n':{}}
+		veryNewObjsOfInterest = {}
+		objsOfInterest = {'n':{}}
+		nnoi = newObjsOfInterest['n']
+		for nodeId in nodesOfInterest:
+			nnoi[nodeId] = nodesOfInterest[nodeId]
+
+		done = False
+		while not done:
+			#Aquire parents of new objects
+			for objType in newObjsOfInterest:
+				objOfType = newObjsOfInterest[objType]
+
+				for objId in objOfType:
+					objXml = objOfType[objId]
+					objCurrentParents = self.currentParentStore.GetCurrentParents(objType, objId)
+					#print objType, objId, objCurrentParents
+					for t, i, v in objCurrentParents:
+						if t not in veryNewObjsOfInterest:
+							veryNewObjsOfInterest[t] = {}
+						oot = veryNewObjsOfInterest[t]
+						oot[i] = None
+
+			#Merge new objects into existing objects
+			for objType in newObjsOfInterest:
+				if objType not in objsOfInterest:
+					objsOfInterest[objType] = {}
+				fromOot = newObjsOfInterest[objType]
+				toOot = objsOfInterest[objType]
+				for objId in fromOot:
+					toOot[objId] = fromOot[objId]
+
+			#Reset temporary object stores
+			newObjsOfInterest = veryNewObjsOfInterest
+			veryNewObjsOfInterest = {}
+
+			#Count pending objects
+			count = 0
+			for objType in newObjsOfInterest:
+				count += len(newObjsOfInterest[objType])
+			if count == 0:
+				done = True
+
+		for objType in objsOfInterest:
+			print "count", objType, len(objsOfInterest[objType])
+
+		print "Get data for objects"
+		GetDataForObjs(objsOfInterest, self.versionStore, self.osmObjectStore)
+
+		print "Complete ways"
+		if 'n' not in objsOfInterest:
+			objsOfInterest['n'] = {}
+		if 'w' in objsOfInterest:
+			ways = objsOfInterest['w']
+			nodes = objsOfInterest['n']
+			for objId in ways:
+				#print objId
+				wayXmlTree = ET.fromstring(ways[objId].encode('utf-8'))
+
+				for ch in wayXmlTree:
+					if ch.tag != "nd": continue
+					nid = int(ch.attrib['ref'])
+					if nid not in nodes:
+						nodes[nid] = None
+
+		for objType in objsOfInterest:
+			print "count", objType, len(objsOfInterest[objType])
+
+		print "Get data for objects 2"
+		GetDataForObjs(objsOfInterest, self.versionStore, self.osmObjectStore)
+
+		print "Output result"
+		out.write("<?xml version='1.0' encoding='UTF-8'?>\n")
+		out.write("<osm version='0.6' generator='py'>\n")
+		out.write("<bounds minlat='{1}' minlon='{0}' maxlat='{3}' maxlon='{2}'/>\n".format(*queryArea))
+
+		if 'n' in objsOfInterest:
+			objs = objsOfInterest['n']
+			for objId in objs:
+				out.write(objs[objId].encode("utf-8"))
+		if 'w' in objsOfInterest:
+			objs = objsOfInterest['w']
+			for objId in objs:
+				out.write(objs[objId].encode("utf-8"))
+		if 'r' in objsOfInterest:
+			objs = objsOfInterest['r']
+			for objId in objs:
+				out.write(objs[objId].encode("utf-8"))
+
+		out.write("</osm>\n")
+		out.close()
+
+
+
 if __name__=="__main__":
 	
-	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial", readOnly = True))
+	getArea = GetArea()
+	#getArea.GetArea([-0.5142975,51.2413932,-0.4645157,51.2738368], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
+	getArea.GetTile(1021, 683, 11, bz2.BZ2File("out.osm.bz2", "w"))
 
-	osmObjectStore = OsmObjectStore("ukdump2")
-	versionStore = VersionStore()
-	parentsStore = ParentsStore()
-	currentParentStore = CurrentParentStore(versionStore, parentsStore)
-
-	if 1:
-		#queryArea = [-0.5142975,51.2413932,-0.4645157,51.2738368] #left,bottom,right,top
-		#nodesOfInterest = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore)
-
-		tileNum = (11, 1021, 683)
-		nw = slippy.num2deg(tileNum[1], tileNum[2], tileNum[0])
-		se = slippy.num2deg(tileNum[1]+1, tileNum[2]+1, tileNum[0])
-		queryArea = [nw[1], nw[0], se[1], se[0]]
-		nodesOfInterest = GetNodesInSlippyTile(spatialIndex, tileNum, osmObjectStore, versionStore)
-
-		#pickle.dump(nodesOfInterest, open("nodesOfInterest.dat","wb"), protocol=-1)
-	else:
-		nodesOfInterest = pickle.load(open("nodesOfInterest.dat","rb"))
-
-	#Get parents of objects
-	print "Get parents of objects"
-
-	newObjsOfInterest = {'n':{}}
-	veryNewObjsOfInterest = {}
-	objsOfInterest = {'n':{}}
-	nnoi = newObjsOfInterest['n']
-	for nodeId in nodesOfInterest:
-		nnoi[nodeId] = nodesOfInterest[nodeId]
-
-	done = False
-	while not done:
-		#Aquire parents of new objects
-		for objType in newObjsOfInterest:
-			objOfType = newObjsOfInterest[objType]
-
-			for objId in objOfType:
-				objXml = objOfType[objId]
-				objCurrentParents = currentParentStore.GetCurrentParents(objType, objId)
-				#print objType, objId, objCurrentParents
-				for t, i, v in objCurrentParents:
-					if t not in veryNewObjsOfInterest:
-						veryNewObjsOfInterest[t] = {}
-					oot = veryNewObjsOfInterest[t]
-					oot[i] = None
-
-		#Merge new objects into existing objects
-		for objType in newObjsOfInterest:
-			if objType not in objsOfInterest:
-				objsOfInterest[objType] = {}
-			fromOot = newObjsOfInterest[objType]
-			toOot = objsOfInterest[objType]
-			for objId in fromOot:
-				toOot[objId] = fromOot[objId]
-
-		#Reset temporary object stores
-		newObjsOfInterest = veryNewObjsOfInterest
-		veryNewObjsOfInterest = {}
-
-		#Count pending objects
-		count = 0
-		for objType in newObjsOfInterest:
-			count += len(newObjsOfInterest[objType])
-		if count == 0:
-			done = True
-
-	for objType in objsOfInterest:
-		print "count", objType, len(objsOfInterest[objType])
-
-	print "Get data for objects"
-	GetDataForObjs(objsOfInterest, versionStore, osmObjectStore)
-
-	print "Complete ways"
-	if 'n' not in objsOfInterest:
-		objsOfInterest['n'] = {}
-	if 'w' in objsOfInterest:
-		ways = objsOfInterest['w']
-		nodes = objsOfInterest['n']
-		for objId in ways:
-			#print objId
-			wayXmlTree = ET.fromstring(ways[objId].encode('utf-8'))
-
-			for ch in wayXmlTree:
-				if ch.tag != "nd": continue
-				nid = int(ch.attrib['ref'])
-				if nid not in nodes:
-					nodes[nid] = None
-
-	for objType in objsOfInterest:
-		print "count", objType, len(objsOfInterest[objType])
-
-	print "Get data for objects 2"
-	GetDataForObjs(objsOfInterest, versionStore, osmObjectStore)
-
-	print "Output result"
-	out = open("out.osm", "wt")
-	out.write("<?xml version='1.0' encoding='UTF-8'?>\n")
-	out.write("<osm version='0.6' generator='py'>\n")
-	out.write("<bounds minlat='{1}' minlon='{0}' maxlat='{3}' maxlon='{2}'/>\n".format(*queryArea))
-
-	if 'n' in objsOfInterest:
-		objs = objsOfInterest['n']
-		for objId in objs:
-			out.write(objs[objId].encode("utf-8"))
-	if 'w' in objsOfInterest:
-		objs = objsOfInterest['w']
-		for objId in objs:
-			out.write(objs[objId].encode("utf-8"))
-	if 'r' in objsOfInterest:
-		objs = objsOfInterest['r']
-		for objId in objs:
-			out.write(objs[objId].encode("utf-8"))
-
-	out.write("</osm>\n")
-	out.close()
-
-	print "Close spatial index"
-	del spatialIndex
-
-	print "Close object storage"
-	del osmObjectStore
-
-	print "Close version index"
-	del versionStore
-
-	print "Close parent index"
-	del parentsStore
-
-	print "All done"
-
- 
