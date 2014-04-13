@@ -36,7 +36,7 @@ class OsmObjectStore(object):
 		rawStr = self.mainData.read(endPos - startPos)
 		return rawStr.decode('utf-8')
 
-def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
+def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore, tolerateMissing):
 
 	zoomLevel = 11
 
@@ -73,6 +73,9 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 					#Retain latest version
 					if nodeVer > candidateNodes[nodeId]:
 						candidateNodes[nodeId] = nodeVer
+
+	if not tolerateMissing and tileHits != tileCount:
+		raise RuntimeError("Missing tiles detected")
 
 	print "Checking for latest versions"
 
@@ -116,7 +119,7 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 	
 	return nodeInfo
 
-def GetNodesInSlippyTile(spatialIndex, queryArea, osmObjectStore, versionStore):
+def GetNodesInSlippyTile(spatialIndex, queryArea, osmObjectStore, versionStore, tolerateMissing):
 	zoomLevel = queryArea[0]
 
 	#Determine which data tiles to check for query
@@ -149,6 +152,9 @@ def GetNodesInSlippyTile(spatialIndex, queryArea, osmObjectStore, versionStore):
 					#Retain latest version
 					if nodeVer > candidateNodes[nodeId]:
 						candidateNodes[nodeId] = nodeVer
+
+	if not tolerateMissing and tileHits != tileCount:
+		raise RuntimeError("Missing tiles detected")
 
 	print "Checking for latest versions"
 
@@ -295,17 +301,17 @@ class GetArea(object):
 
 		print "All done"
 
-	def GetArea(self, queryArea, out):
+	def GetArea(self, queryArea, out, tolerateMissing = True):
 		
-		nodesOfInterest = GetNodesInCustomArea(self.spatialIndex, queryArea, self.osmObjectStore, self.versionStore)
+		nodesOfInterest = GetNodesInCustomArea(self.spatialIndex, queryArea, self.osmObjectStore, self.versionStore, tolerateMissing)
 		self.NodesToCompleteData(nodesOfInterest, queryArea, out)
 
-	def GetTile(self, tilex, tiley, zoom, out):
+	def GetTile(self, tilex, tiley, zoom, out, tolerateMissing = True):
 		tileNum = (zoom, tilex, tiley)
 		nw = slippy.num2deg(tilex, tiley, zoom)
 		se = slippy.num2deg(tilex+1, tiley+1, zoom)
 		queryArea = [nw[1], nw[0], se[1], se[0]]
-		nodesOfInterest = GetNodesInSlippyTile(self.spatialIndex, tileNum, self.osmObjectStore, self.versionStore)
+		nodesOfInterest = GetNodesInSlippyTile(self.spatialIndex, tileNum, self.osmObjectStore, self.versionStore, tolerateMissing)
 		self.NodesToCompleteData(nodesOfInterest, queryArea, out)
 
 	def NodesToCompleteData(self, nodesOfInterest, queryArea, out):
@@ -420,7 +426,10 @@ def MultiTileSave(getArea, queryArea, zoom):
 		if not os.path.exists(str(tilex)):
 			os.mkdir(str(tilex))
 		for tiley in range(tl[1], br[1]+2):
-			getArea.GetTile(tilex, tiley, zoom, bz2.BZ2File("{0}/{1}.osm.bz2".format(tilex, tiley), "w"))
+			try:
+				getArea.GetTile(tilex, tiley, zoom, bz2.BZ2File("{0}/{1}.osm.bz2".format(tilex, tiley), "w"), False)
+			except RuntimeError as err:
+				print err
 
 if __name__=="__main__":
 	
