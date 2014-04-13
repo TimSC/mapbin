@@ -290,7 +290,22 @@ if __name__=="__main__":
 	GetDataForObjs(objsOfInterest, versionStore, osmObjectStore)
 
 	print "Output result"
-	
+	out = open("out.osm", "wt")
+
+	if 'n' in objsOfInterest:
+		objs = objsOfInterest['n']
+		for objId in objs:
+			out.write(objs[objId].encode("utf-8"))
+	if 'w' in objsOfInterest:
+		objs = objsOfInterest['w']
+		for objId in objs:
+			out.write(objs[objId].encode("utf-8"))
+	if 'r' in objsOfInterest:
+		objs = objsOfInterest['r']
+		for objId in objs:
+			out.write(objs[objId].encode("utf-8"))
+
+	out.close()
 
 	print "Close spatial index"
 	del spatialIndex
