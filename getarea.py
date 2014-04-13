@@ -213,9 +213,9 @@ if __name__=="__main__":
 	parentsStore = ParentsStore()
 	currentParentStore = CurrentParentStore(versionStore, parentsStore)
 
-	if 0:
+	if 1:
 		nodesOfInterest = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore)
-		pickle.dump(nodesOfInterest, open("nodesOfInterest.dat","wb"), protocol=-1)
+		#pickle.dump(nodesOfInterest, open("nodesOfInterest.dat","wb"), protocol=-1)
 	else:
 		nodesOfInterest = pickle.load(open("nodesOfInterest.dat","rb"))
 
@@ -291,6 +291,9 @@ if __name__=="__main__":
 
 	print "Output result"
 	out = open("out.osm", "wt")
+	out.write("<?xml version='1.0' encoding='UTF-8'?>\n")
+	out.write("<osm version='0.6' generator='py'>\n")
+	out.write("<bounds minlat='{1}' minlon='{0}' maxlat='{3}' maxlon='{2}'/>\n".format(*queryArea))
 
 	if 'n' in objsOfInterest:
 		objs = objsOfInterest['n']
@@ -305,6 +308,7 @@ if __name__=="__main__":
 		for objId in objs:
 			out.write(objs[objId].encode("utf-8"))
 
+	out.write("</osm>\n")
 	out.close()
 
 	print "Close spatial index"
