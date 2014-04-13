@@ -9,23 +9,23 @@ class OsmObjectStore(object):
 		self.mainData = compressedfile.CompressedFile(fina, readOnly = True)
 		self.ns = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodestart.hash", readOnly = True), readOnly = True)
 		self.ne = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodeend.hash", readOnly = True), readOnly = True)
-		self.ws = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodestart.hash", readOnly = True), readOnly = True)
-		self.we = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodeend.hash", readOnly = True), readOnly = True)
-		self.rs = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodestart.hash", readOnly = True), readOnly = True)
-		self.re = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodeend.hash", readOnly = True), readOnly = True)
+		self.ws = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"waystart.hash", readOnly = True), readOnly = True)
+		self.we = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"wayend.hash", readOnly = True), readOnly = True)
+		self.rs = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"relationstart.hash", readOnly = True), readOnly = True)
+		self.re = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"relationend.hash", readOnly = True), readOnly = True)
 
 	def Get(self, objType, objId, objVer):
 		startPos = None
 		endPos = None
-		if objType == "node":
+		if objType in ["n", "node"]:
 			startPos = self.ns[objId][objVer]
 			endPos = self.ne[objId][objVer]
 
-		if objType == "way":
+		if objType in ["w", "way"]:
 			startPos = self.ws[objId][objVer]
 			endPos = self.we[objId][objVer]
 
-		if objType == "relation":
+		if objType in ["r", "relation"]:
 			startPos = self.rs[objId][objVer]
 			endPos = self.re[objId][objVer]
 
@@ -187,6 +187,21 @@ class CurrentParentStore(object):
 
 		return out
 		
+def GetDataForObjs(objsOfInterest, versionStore, osmObjectStore):
+	for objType in objsOfInterest:
+		objOfType = objsOfInterest[objType]
+		for objId in objOfType:
+			if objOfType[objId] is not None:
+				continue
+
+			try:
+				currentVer = versionStore.GetVersion(objType, objId)
+
+				objXml = osmObjectStore.Get(objType, objId, currentVer)
+				objOfType[objId] = objXml
+			except IndexError as err: 
+				print "Missing", objType, objId, err
+
 if __name__=="__main__":
 	
 	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial", readOnly = True))
@@ -252,6 +267,30 @@ if __name__=="__main__":
 
 	for objType in objsOfInterest:
 		print "count", objType, len(objsOfInterest[objType])
+
+	print "Get data for objects"
+	GetDataForObjs(objsOfInterest, versionStore, osmObjectStore)
+
+	print "Complete ways"
+	if 'n' not in objsOfInterest:
+		objsOfInterest['n'] = {}
+	if 'w' in objsOfInterest:
+		ways = objsOfInterest['w']
+		nodes = objsOfInterest['n']
+		for objId in ways:
+			#print objId
+			wayXmlTree = ET.fromstring(ways[objId])
+			for ch in wayXmlTree:
+				if ch.tag != "nd": continue
+				nid = int(ch.attrib['ref'])
+				if nid not in nodes:
+					nodes[nid] = None
+
+	print "Get data for objects 2"
+	GetDataForObjs(objsOfInterest, versionStore, osmObjectStore)
+
+	print "Output result"
+	
 
 	print "Close spatial index"
 	del spatialIndex
