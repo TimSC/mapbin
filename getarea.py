@@ -1,4 +1,4 @@
-import sys, os, math, struct, pickle
+import sys, os, math, struct, pickle, bz2
 from pycontainers import compressedfile, qsfs, hashtable
 import slippy
 import xml.etree.ElementTree as ET
@@ -33,8 +33,8 @@ class OsmObjectStore(object):
 			return None
 
 		self.mainData.seek(startPos)
-		return self.mainData.read(endPos - startPos)
-
+		rawStr = self.mainData.read(endPos - startPos)
+		return rawStr.decode('utf-8')
 
 def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 
@@ -94,7 +94,7 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 		objStr = osmObjectStore.Get("node", nodeId, currentNodes[nodeId])
 		#print nodeId, "'"+objStr+"'"
 		#print len(objStr)
-		nodeXmlTree = ET.fromstring("<?xml version='1.0' encoding='UTF-8'?>\n"+objStr)
+		nodeXmlTree = ET.fromstring(objStr.encode("utf-8"))
 
 		lat = float(nodeXmlTree.attrib['lat'])
 		lon = float(nodeXmlTree.attrib['lon'])
@@ -104,6 +104,66 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 		if lon < queryArea[0] or lon > queryArea[2]:
 			continue
 
+		nodeInfo[nodeId] = objStr
+
+	#print spatialIndex.listdir("/11/1022")
+
+	print "Num nodes in area", len(nodeInfo)
+	
+	return nodeInfo
+
+def GetNodesInSlippyTile(spatialIndex, queryArea, osmObjectStore, versionStore):
+	zoomLevel = queryArea[0]
+
+	#Determine which data tiles to check for query
+	xr = range(queryArea[1], queryArea[1]+1)
+	yr = range(queryArea[2], queryArea[2]+1)
+
+	print "Getting nodes from tile ranges", xr, yr
+	nodeEntry = struct.Struct(">QI")
+
+	#Get candidate nodes from spatial index
+	candidateNodes = {}
+	for tilex in xr:
+		for tiley in yr:
+			tileFina = "/{0}/{1}/{2}.dat".format(zoomLevel, tilex, tiley)
+			if not spatialIndex.exists(tileFina):
+				continue
+			print tilex, tiley
+			fi = spatialIndex.open(tileFina)
+			numNodeEntries = len(fi) / nodeEntry.size
+			for nodeNum in range(numNodeEntries):
+				fi.seek(nodeNum * nodeEntry.size)
+				nodeId, nodeVer = nodeEntry.unpack(fi.read(nodeEntry.size))
+				if nodeId not in candidateNodes:
+					candidateNodes[nodeId] = nodeVer
+				else:
+					#Retain latest version
+					if nodeVer > candidateNodes[nodeId]:
+						candidateNodes[nodeId] = nodeVer
+
+	print "Checking for latest versions"
+
+	#Check these are the latest known version of the node
+	currentNodes = {}
+	for nodeId in candidateNodes:
+		try:
+			latestVer = versionStore.GetVersion("node", nodeId)
+			foundVer = candidateNodes[nodeId]
+			#print nodeId, latestVer, foundVer
+			if latestVer == foundVer:
+				currentNodes[nodeId] = foundVer
+		except:
+			print "Missing node", nodeId
+
+	print "Num candidate nodes", len(currentNodes)
+
+	#Filter to find those in bounding box
+	print "Get node data"
+	
+	nodeInfo = {}
+	for nodeId in currentNodes:
+		objStr = osmObjectStore.Get("node", nodeId, currentNodes[nodeId])
 		nodeInfo[nodeId] = objStr
 
 	#print spatialIndex.listdir("/11/1022")
@@ -206,15 +266,21 @@ if __name__=="__main__":
 	
 	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial", readOnly = True))
 
-	queryArea = [-0.5142975,51.2413932,-0.4645157,51.2738368] #left,bottom,right,top
-
 	osmObjectStore = OsmObjectStore("ukdump2")
 	versionStore = VersionStore()
 	parentsStore = ParentsStore()
 	currentParentStore = CurrentParentStore(versionStore, parentsStore)
 
 	if 1:
-		nodesOfInterest = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore)
+		#queryArea = [-0.5142975,51.2413932,-0.4645157,51.2738368] #left,bottom,right,top
+		#nodesOfInterest = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore)
+
+		tileNum = (11, 1021, 683)
+		nw = slippy.num2deg(tileNum[1], tileNum[2], tileNum[0])
+		se = slippy.num2deg(tileNum[1]+1, tileNum[2]+1, tileNum[0])
+		queryArea = [nw[1], nw[0], se[1], se[0]]
+		nodesOfInterest = GetNodesInSlippyTile(spatialIndex, tileNum, osmObjectStore, versionStore)
+
 		#pickle.dump(nodesOfInterest, open("nodesOfInterest.dat","wb"), protocol=-1)
 	else:
 		nodesOfInterest = pickle.load(open("nodesOfInterest.dat","rb"))
@@ -279,12 +345,16 @@ if __name__=="__main__":
 		nodes = objsOfInterest['n']
 		for objId in ways:
 			#print objId
-			wayXmlTree = ET.fromstring(ways[objId])
+			wayXmlTree = ET.fromstring(ways[objId].encode('utf-8'))
+
 			for ch in wayXmlTree:
 				if ch.tag != "nd": continue
 				nid = int(ch.attrib['ref'])
 				if nid not in nodes:
 					nodes[nid] = None
+
+	for objType in objsOfInterest:
+		print "count", objType, len(objsOfInterest[objType])
 
 	print "Get data for objects 2"
 	GetDataForObjs(objsOfInterest, versionStore, osmObjectStore)
