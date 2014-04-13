@@ -392,24 +392,41 @@ class GetArea(object):
 		if 'n' in objsOfInterest:
 			objs = objsOfInterest['n']
 			for objId in objs:
-				out.write(objs[objId].encode("utf-8"))
+				obj = objs[objId]
+				if obj is None: continue
+				out.write(obj.encode("utf-8"))
 		if 'w' in objsOfInterest:
 			objs = objsOfInterest['w']
 			for objId in objs:
-				out.write(objs[objId].encode("utf-8"))
+				obj = objs[objId]
+				if obj is None: continue
+				out.write(obj.encode("utf-8"))
 		if 'r' in objsOfInterest:
 			objs = objsOfInterest['r']
 			for objId in objs:
-				out.write(objs[objId].encode("utf-8"))
+				obj = objs[objId]
+				if obj is None: continue
+				out.write(obj.encode("utf-8"))
 
 		out.write("</osm>\n")
 		out.close()
 
+def MultiTileSave(getArea, queryArea, zoom):
 
+	tl = slippy.deg2num(queryArea[3], queryArea[0], 11)
+	br = slippy.deg2num(queryArea[1], queryArea[2], 11)
+
+	for tilex in range(tl[0], br[0]+2):
+		if not os.path.exists(str(tilex)):
+			os.mkdir(str(tilex))
+		for tiley in range(tl[1], br[1]+2):
+			getArea.GetTile(tilex, tiley, zoom, bz2.BZ2File("{0}/{1}.osm.bz2".format(tilex, tiley), "w"))
 
 if __name__=="__main__":
 	
 	getArea = GetArea()
 	#getArea.GetArea([-0.5142975,51.2413932,-0.4645157,51.2738368], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
-	getArea.GetTile(1021, 683, 11, bz2.BZ2File("out.osm.bz2", "w"))
+	#getArea.GetTile(1021, 683, 11, bz2.BZ2File("out.osm.bz2", "w"))
 
+	MultiTileSave(getArea, [-9.4042969,49.3823728,2.7246094,62.8751884], 11)
+	
