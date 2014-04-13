@@ -1,4 +1,4 @@
-import sys, os, math, struct
+import sys, os, math, struct, pickle
 from pycontainers import compressedfile, qsfs, hashtable
 import slippy
 import xml.etree.ElementTree as ET
@@ -36,7 +36,7 @@ class OsmObjectStore(object):
 		return self.mainData.read(endPos - startPos)
 
 
-def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, nodeVersions):
+def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore):
 
 	zoomLevel = 11
 
@@ -76,7 +76,7 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, nodeVersions):
 	currentNodes = {}
 	for nodeId in candidateNodes:
 		try:
-			latestVer = nodeVersions[nodeId]
+			latestVer = versionStore.GetVersion("node", nodeId)
 			foundVer = candidateNodes[nodeId]
 			#print nodeId, latestVer, foundVer
 			if latestVer == foundVer:
@@ -112,16 +112,146 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, nodeVersions):
 	
 	return nodeInfo
 
+class VersionStore(object):
+	def __init__(self):
+		self.nodeVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vnode", readOnly = True), readOnly = True)
+		self.wayVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vway", readOnly = True), readOnly = True)
+		self.relationVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vrelation", readOnly = True), readOnly = True)
+
+	def GetVersion(self, objType, objId):
+		if objType in ["n", "node"]:
+			return self.nodeVersions[objId]
+		if objType in ["w", "way"]:
+			return self.wayVersions[objId]
+		if objType in ["r", "relation"]:
+			return self.relationVersions[objId]
+
+		raise RuntimeError("Unknown object type")
+
+class ParentsStore(object):
+	def __init__(self):
+		self.nodeParents = hashtable.HashTableFile(compressedfile.CompressedFile("child.node", readOnly = True), readOnly = True)
+		self.wayParents = hashtable.HashTableFile(compressedfile.CompressedFile("child.way", readOnly = True), readOnly = True)
+		self.relationParents = hashtable.HashTableFile(compressedfile.CompressedFile("child.relation", readOnly = True), readOnly = True)
+
+	def GetParents(self, objType, objId):
+
+		typeStore = None
+		if objType in ["n", "node"]:
+			typeStore = self.nodeParents
+		if objType in ["w", "way"]:
+			typeStore = self.wayParents
+		if objType in ["r", "relation"]:
+			typeStore = self.relationParents
+
+		if typeStore is None:
+			raise RuntimeError("Unknown object type:"+str(objType))
+
+		if objId in typeStore:
+			out = {}
+			parents = typeStore[objId]
+			#print parents
+			for objVer in parents:
+				for t, oid in parents[objVer]:
+					#print t, oid
+					if t not in out:
+						out[t] = {}
+					outOfType = out[t]
+					if oid not in outOfType:
+						outOfType[oid] = set()
+					outOfObj = outOfType[oid]
+					outOfObj.add(objVer)
+
+			return out
+		else:
+			#print nodeId, "is an orphan"
+			return []
+
+class CurrentParentStore(object):
+	def __init__(self, versionStore, parentsStore):
+		self.versionStore = versionStore
+		self.parentsStore = parentsStore
+
+	def GetCurrentParents(self, objType, objId):
+		out = []
+		allParents = self.parentsStore.GetParents(objType, objId)
+		for t in allParents:
+			objOfType = allParents[t]
+			for oid in objOfType:
+				foundVers = objOfType[oid]
+				maxVer = max(foundVers)
+
+				currentVer = self.versionStore.GetVersion(t, oid)
+				if maxVer == currentVer:
+					out.append((t, oid, currentVer))
+
+		return out
+		
 if __name__=="__main__":
 	
-	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial"))
+	spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial", readOnly = True))
 
 	queryArea = [-0.5142975,51.2413932,-0.4645157,51.2738368] #left,bottom,right,top
 
 	osmObjectStore = OsmObjectStore("ukdump2")
-	nodeVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vnode"), readOnly = True)
+	versionStore = VersionStore()
+	parentsStore = ParentsStore()
+	currentParentStore = CurrentParentStore(versionStore, parentsStore)
 
-	nodesInArea = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, nodeVersions)
+	if 0:
+		nodesOfInterest = GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore)
+		pickle.dump(nodesOfInterest, open("nodesOfInterest.dat","wb"), protocol=-1)
+	else:
+		nodesOfInterest = pickle.load(open("nodesOfInterest.dat","rb"))
+
+	#Get parents of objects
+	print "Get parents of objects"
+
+	newObjsOfInterest = {'n':{}}
+	veryNewObjsOfInterest = {}
+	objsOfInterest = {'n':{}}
+	nnoi = newObjsOfInterest['n']
+	for nodeId in nodesOfInterest:
+		nnoi[nodeId] = nodesOfInterest[nodeId]
+
+	done = False
+	while not done:
+		#Aquire parents of new objects
+		for objType in newObjsOfInterest:
+			objOfType = newObjsOfInterest[objType]
+
+			for objId in objOfType:
+				objXml = objOfType[objId]
+				objCurrentParents = currentParentStore.GetCurrentParents(objType, objId)
+				#print objType, objId, objCurrentParents
+				for t, i, v in objCurrentParents:
+					if t not in veryNewObjsOfInterest:
+						veryNewObjsOfInterest[t] = {}
+					oot = veryNewObjsOfInterest[t]
+					oot[i] = None
+
+		#Merge new objects into existing objects
+		for objType in newObjsOfInterest:
+			if objType not in objsOfInterest:
+				objsOfInterest[objType] = {}
+			fromOot = newObjsOfInterest[objType]
+			toOot = objsOfInterest[objType]
+			for objId in fromOot:
+				toOot[objId] = fromOot[objId]
+
+		#Reset temporary object stores
+		newObjsOfInterest = veryNewObjsOfInterest
+		veryNewObjsOfInterest = {}
+
+		#Count pending objects
+		count = 0
+		for objType in newObjsOfInterest:
+			count += len(newObjsOfInterest[objType])
+		if count == 0:
+			done = True
+
+	for objType in objsOfInterest:
+		print "count", objType, len(objsOfInterest[objType])
 
 	print "Close spatial index"
 	del spatialIndex
@@ -130,7 +260,10 @@ if __name__=="__main__":
 	del osmObjectStore
 
 	print "Close version index"
-	del nodeVersions
+	del versionStore
+
+	print "Close parent index"
+	del parentsStore
 
 	print "All done"
 
