@@ -426,10 +426,12 @@ def MultiTileSave(getArea, queryArea, zoom):
 		if not os.path.exists(str(tilex)):
 			os.mkdir(str(tilex))
 		for tiley in range(tl[1], br[1]+2):
+			fina = "{0}/{1}.osm.bz2".format(tilex, tiley)
 			try:
-				getArea.GetTile(tilex, tiley, zoom, bz2.BZ2File("{0}/{1}.osm.bz2".format(tilex, tiley), "w"), False)
+				getArea.GetTile(tilex, tiley, zoom, bz2.BZ2File(fina, "w"), False)
 			except RuntimeError as err:
 				print err
+				os.unlink(fina)
 
 if __name__=="__main__":
 	
