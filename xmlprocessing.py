@@ -64,6 +64,7 @@ class RewriteXml(object):
 		self.outFi = outFi
 		self.pos = 0
 		self.parseOnly = 0
+		self.incremental = None
 
 		if self.outFi is not None:
 			wr = "<?xml version='1.0' encoding='UTF-8'?>\n"
@@ -75,6 +76,24 @@ class RewriteXml(object):
 		fi.seek(0)
 		self.fiTmp = fi
 		self.parser.ParseFile(fi)
+
+	def StartIncremental(self, fi):
+		if self.incremental is not None:
+			raise RuntimeError("Incremental decode already start")
+		fi.seek(0)
+		self.incremental = fi
+
+	def DoIncremental(self):
+		if self.incremental is None:
+			raise RuntimeError("Incremental not started")
+		buff = self.incremental.read(1000000)
+		if len(buff) > 0:
+			self.parser.Parse(buff, 0)
+			return 0 #Not done
+		else:
+			self.parser.Parse(buff, 1)
+			self.incremental = None
+			return 1 #All done
 
 	def HandleCharData(self, data):
 		pass
