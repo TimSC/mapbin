@@ -114,8 +114,12 @@ class MainWindow(QtGui.QMainWindow):
 			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)
+		self.dataImport.setFrameShape(QtGui.QFrame.StyledPanel)
+		self.mainLayout.addWidget(self.dataImport)
 
 		self.mainLayout = QtGui.QVBoxLayout()
+
+		self.dataImportFrame = QtGui.QFrame()
 
 		self.startButton = QtGui.QPushButton("Start")
 		self.startButton.pressed.connect(self.StartPressed)
