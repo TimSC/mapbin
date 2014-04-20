@@ -13,23 +13,38 @@ def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 	except:
 		pass
 
-	compfile = compressedfile.CompressedFile(fina)
+	compfile = compressedfile.CompressedFile(fina, createFile = False)
 	compfile.maxCachePages = maxCachedPages
-	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000)
+	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000, createFile = True)
 	return table, compfile
+
+def StoreFactoryRead(fina, maxCachedPages = 50):
+	compfile = compressedfile.CompressedFile(fina, createFile = False)
+	compfile.maxCachePages = maxCachedPages
+	table = hashtable.HashTableFile(compfile, createFile = False)
+	return table, compfile	
 
 class TagIndex(object):
 
-	def __init__(self, nodeParentStore, wayParentStore, relationParentStore):
+	def __init__(self, prefix, createFile = True):
 		self.nodes = 0
 		self.ways = 0
 		self.relations = 0
 		self.objs = 0
 		self.lastDisplayTime = time.time()
 		self.lastDisplayCount = 0
-		self.nodeParentStore = nodeParentStore
-		self.wayParentStore = wayParentStore
-		self.relationParentStore = relationParentStore
+
+		self.objNumStart = None
+		self.objNumEnd = None
+
+		if createFile:
+			self.nodeParentStore, self.compFiN = StoreFactoryCreate(prefix+".node", 32, 5000)
+			self.wayParentStore, self.compFiW = StoreFactoryCreate(prefix+".way", 28, 1000)
+			self.relationParentStore, self.compFiR = StoreFactoryCreate(prefix+".relation", 22, 1000)
+		else:
+			self.nodeParentStore, self.compFiN = StoreFactoryRead(prefix+".node", 5000)
+			self.wayParentStore, self.compFiW = StoreFactoryRead(prefix+".way", 1000)
+			self.relationParentStore, self.compFiR = StoreFactoryRead(prefix+".relation", 1000)
 
 	def __del__(self):
 		print "Flushing"
@@ -71,13 +86,17 @@ class TagIndex(object):
 		if depth != 2:
 			return
 
+		doInsert = True
+		if self.objNumStart is not None and self.objNumStart > self.objs:
+			doInsert = False
+		if self.objNumEnd is not None and self.objNumEnd < self.objs:
+			doInsert = False
+
 		if time.time() - self.lastDisplayTime > 1.:
 			rate = (self.objs - self.lastDisplayCount) / (time.time() - self.lastDisplayTime)
 			self.lastDisplayCount = self.objs
 			self.lastDisplayTime = time.time()
 			print self.nodes, self.ways, self.relations, self.objs, "("+str(rate)+" obj per sec)"
-
-		self.objs += 1
 
 		if self.objs % 100000 == 0:
 			print "Flushing"
@@ -89,21 +108,31 @@ class TagIndex(object):
 			self.nodes += 1
 
 		if name == "way":
-			#print name, childTags, childMembers
-			objId = int(attr['id'])
-			version = int(attr['version'])
-			for chType, chRef, chRole in childMembers:
-				self.AddParent(chType, chRef, name, objId, version)
+			if doInsert:
+				#print name, childTags, childMembers
+				objId = int(attr['id'])
+				version = int(attr['version'])
+				for chType, chRef, chRole in childMembers:
+					self.AddParent(chType, chRef, name, objId, version)
 				
 			self.ways += 1
 
 		if name == "relation":
-			#print name, childTags, childMembers
+			if doInsert:
+				#print name, childTags, childMembers				
+				objId = int(attr['id'])
+				version = int(attr['version'])
+				for chType, chRef, chRole in childMembers:
+					self.AddParent(chType, chRef, name, objId, version)
+
 			self.relations += 1
-			objId = int(attr['id'])
-			version = int(attr['version'])
-			for chType, chRef, chRole in childMembers:
-				self.AddParent(chType, chRef, name, objId, version)
+
+		self.objs += 1
+
+	def flush(self):
+			self.nodeParentStore.flush()
+			self.wayParentStore.flush()
+			self.relationParentStore.flush()
 
 if __name__ == "__main__":
 	if len(sys.argv) < 2:
@@ -116,17 +145,11 @@ if __name__ == "__main__":
 
 	infi = bz2.BZ2File(sys.argv[1])
 
-	nodeParentStore, compFiN = StoreFactoryCreate(sys.argv[2]+".node", 26, 5000)
-	wayParentStore, compFiW = StoreFactoryCreate(sys.argv[2]+".way", 26, 1000)
-	relationParentStore, compFiR = StoreFactoryCreate(sys.argv[2]+".relation", 26, 1000)
-
-	tagIndex = TagIndex(nodeParentStore, wayParentStore, relationParentStore)
+	tagIndex = TagIndex(sys.argv[2], True)
 
 	parser = xmlprocessing.ReadXml()
 	parser.TagLimitCallback = tagIndex.TagLimitCallback
 	parser.ParseFile(infi)
-	
-	
 
 	print tagIndex.nodes, tagIndex.ways, tagIndex.relations, tagIndex.objs
 

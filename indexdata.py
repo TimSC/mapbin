@@ -181,6 +181,16 @@ class TagIndex(object):
 		if name == "relation":
 			self.relations += 1
 
+	def flush(self):
+		self.nodeStartTable.flush()
+		self.nodeEndTable.flush()
+
+		self.wayStartTable.flush()
+		self.wayEndTable.flush()
+
+		self.relationStartTable.flush()
+		self.relationEndTable.flush()
+
 if __name__ == "__main__":
 	if len(sys.argv) < 2:
 		print "Specify input file as argument"

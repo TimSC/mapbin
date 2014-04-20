@@ -1,7 +1,7 @@
 #!/usr/bin/python
  
 import sys, os, pickle, time, bz2
-import indexdata, xmlprocessing
+import indexdata, xmlprocessing, indexchildren
 from pycontainers import compressedfile, hashtable
 import PySide
 import PySide.QtGui as QtGui
@@ -18,6 +18,10 @@ class DataImport(object):
 
 	def __del__(self):
 		self.Pause()
+
+		self.parser = None
+		self.outfi = None
+		self.tagIndex = None
 
 	def Start(self):
 		print "StartPressed"
@@ -72,6 +76,9 @@ class DataImport(object):
 		if objCount1 != objCount2:
 			print "Warning: object count mismatch"
 
+		self.tagIndex.flush()
+		self.parser.outFi.flush()
+
 	def Clear(self):
 		if self.running:
 			print "Error: Cannot clear while running"
@@ -88,13 +95,113 @@ class DataImport(object):
 
 	def Update(self):
 		if self.running:
-			ret = self.parser.DoIncremental()
+			try:
+				ret = self.parser.DoIncremental()
+			except Exception as err:
+				print "data import failed", err
+				self.running = False
+				ret = 0
+
 			if ret == 1:
 				print "Stopping dat import, all done"
 				self.running = False
 				self.projectState["dat-progress"] = self.tagIndex.objs
 				self.projectState["dat-done"] = self.tagIndex.objs
+				self.tagIndex.flush()
+				self.parser.outFi.flush()
 
+# ************ Children index class ****************
+
+class ChildrenImport(object):
+	def __init__(self, projectState, workingFolder):
+		self.projectState = projectState
+		self.workingFolder = workingFolder
+		self.running = False
+		self.parser = None
+		self.tagIndex = None
+
+	def __del__(self):
+		self.Pause()
+
+		self.parser = None
+		self.outfi = None
+		self.tagIndex = None
+
+	def Start(self):
+		print "StartPressed"
+		print self.projectState
+
+		if "ch-done" not in self.projectState:
+			self.projectState["ch-done"] = None
+
+		if self.projectState["ch-done"] is not None:
+			print "Children index already done"
+			return
+
+		if self.parser is None:
+			if "ch-created" not in self.projectState:
+				self.projectState["ch-created"] = False
+
+			if not self.projectState["ch-created"]:
+				self.tagIndex = indexchildren.TagIndex(self.workingFolder+"/ch", createFile=True)
+				self.parser = xmlprocessing.ReadXml()
+				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+			else:
+				self.tagIndex = indexchildren.TagIndex(self.workingFolder+"/ch", createFile=False)
+
+				self.parser = xmlprocessing.ReadXml()
+				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+
+				self.tagIndex.objNumStart = self.projectState["ch-progress"]
+				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+
+			self.projectState["ch-created"] = True
+
+		self.running = True
+
+	def Pause(self):
+		print "PausePressed"
+		if not self.running:
+			return
+		self.running = False
+
+		objCount1 = self.tagIndex.objs
+
+		print "Tag index obj count", objCount1
+
+		self.projectState["ch-progress"] = self.tagIndex.objs
+
+		self.tagIndex.flush()
+
+	def Clear(self):
+		if self.running:
+			print "Error: Cannot clear while running"
+			return
+		print "Clearing existing children index"
+
+		self.projectState["ch-created"] = False
+		self.projectState["ch-progress"] = 0
+		self.projectState["ch-done"] = None
+
+		self.parser = None
+		self.outfi = None
+		self.tagIndex = None
+
+	def Update(self):
+		if self.running:
+			try:
+				ret = self.parser.DoIncremental()
+			except Exception as err:
+				print "ch import failed", err
+				self.running = False
+				ret = 0
+			if ret == 1:
+				print "Stopping ch import, all done"
+				self.running = False
+				self.projectState["ch-progress"] = self.tagIndex.objs
+				self.projectState["ch-done"] = self.tagIndex.objs
+				self.tagIndex.flush()
 
 # ************ Main GUI *******************
 
@@ -119,6 +226,7 @@ class MainWindow(QtGui.QMainWindow):
 			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)
+		self.childrenImport = ChildrenImport(self.projectState, self.workingFolder)
 
 		self.mainLayout = QtGui.QVBoxLayout()
 
@@ -238,13 +346,13 @@ class MainWindow(QtGui.QMainWindow):
 		self.dataImport.Clear()
 
 	def ChStartPressed(self):
-		pass
+		self.childrenImport.Start()
 
 	def ChPausePressed(self):
-		pass
+		self.childrenImport.Pause()
 
 	def ChClearPressed(self):
-		pass
+		self.childrenImport.Clear()
 
 	def SpStartPressed(self):
 		pass
@@ -266,7 +374,7 @@ class MainWindow(QtGui.QMainWindow):
 
 	def IdleEvent(self):
 		self.dataImport.Update()
-
+		self.childrenImport.Update()
 		time.sleep(0.01)
 
 
