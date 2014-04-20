@@ -30,6 +30,9 @@ class DataImport(object):
 		if "dat-done" not in self.projectState:
 			self.projectState["dat-done"] = None
 
+		if "dat-progress" not in self.projectState:
+			self.projectState["dat-progress"] = None
+
 		if self.projectState["dat-done"] is not None:
 			print "Data index already done"
 			return
@@ -71,7 +74,8 @@ class DataImport(object):
 		print "Tag index obj count", objCount1
 		print "Dat rewrite obj count", objCount2
 
-		self.projectState["dat-progress"] = self.tagIndex.objs
+		if self.tagIndex.objs > self.projectState["dat-progress"]:
+			self.projectState["dat-progress"] = self.tagIndex.objs
 
 		if objCount1 != objCount2:
 			print "Warning: object count mismatch"
@@ -133,6 +137,8 @@ class ChildrenImport(object):
 
 		if "ch-done" not in self.projectState:
 			self.projectState["ch-done"] = None
+		if "ch-progress" not in self.projectState:
+			self.projectState["ch-progress"] = None
 
 		if self.projectState["ch-done"] is not None:
 			print "Children index already done"
@@ -170,7 +176,8 @@ class ChildrenImport(object):
 
 		print "Tag index obj count", objCount1
 
-		self.projectState["ch-progress"] = self.tagIndex.objs
+		if self.tagIndex.objs > self.projectState["ch-progress"]:
+			self.projectState["ch-progress"] = self.tagIndex.objs
 
 		self.tagIndex.flush()
 
@@ -221,9 +228,9 @@ class MainWindow(QtGui.QMainWindow):
 			self.projectState = pickle.load(open(self.statusFina, "rt"))
 
 		if "input" not in self.projectState:
-			self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
+			#self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
 			#self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
-			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
+			self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)
 		self.childrenImport = ChildrenImport(self.projectState, self.workingFolder)
