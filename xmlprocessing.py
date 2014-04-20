@@ -50,6 +50,28 @@ class ReadXml(object):
 		self.tags.pop()
 		self.attr.pop()
 
+class OutFileControl(object):
+	def __init__(self, outFi):
+		self.outFi = outFi
+		self.objs = 0
+		self.startObjNum = None
+		self.endObjNum = None
+
+	def flush(self):
+		self.outFi.flush()
+
+	def write(self, dat):
+		if self.startObjNum is not None:
+			if self.obj < self.startObjNum: return
+		if self.endObjNum is not None:
+			if self.obj > self.endObjNum: return
+ 
+		self.outFi.write(dat)
+
+	def depthlimit(self, depth):
+		if depth == 2:
+			self.objs += 1
+
 class RewriteXml(object):
 	def __init__(self, outFi):
 		self.parser = expat.ParserCreate()
@@ -61,7 +83,10 @@ class RewriteXml(object):
 		self.tags = []
 		self.attr = []
 		self.tagStarts = []
-		self.outFi = outFi
+		if isinstance(outFi, OutFileControl):
+			self.outFi = outFi
+		else:
+			self.outFi = OutFileControl(outFi)
 		self.pos = 0
 		self.parseOnly = 0
 		self.incremental = None
@@ -131,6 +156,8 @@ class RewriteXml(object):
 
 		if self.TagLimitCallback is not None:
 			self.TagLimitCallback(name, self.depth, self.attr[-1], self.tagStarts[-1], self.pos)
+
+		self.outFi.depthlimit(self.depth)
 
 		self.depth -= 1
 		self.tags.pop()

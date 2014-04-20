@@ -52,17 +52,42 @@ class MainWindow(QtGui.QMainWindow):
 
 	def closeEvent(self, event):
 		print "Write current state"
+		print self.projectState
 		pickle.dump(self.projectState, open(self.statusFina, "wt"))
 
 	def StartPressed(self):
 		print "StartPressed"
+		print self.projectState
+
+		if "dat-done" not in self.projectState:
+			self.projectState["dat-done"] = None
+
+		if self.projectState["dat-done"] is not None:
+			print "Data index already done"
+			return
 
 		if self.parser is None:
-			self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data")
-			self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data")
-			self.parser = xmlprocessing.RewriteXml(self.outfi)
-			self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
-			self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+			if "dat-created" not in self.projectState:
+				self.projectState["dat-created"] = False
+
+			if not self.projectState["dat-created"]:
+				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=True)
+				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=True)
+				self.parser = xmlprocessing.RewriteXml(self.outfi)
+				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+			else:
+				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=False)
+				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=False)
+
+				self.parser = xmlprocessing.RewriteXml(self.outfi)
+				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+
+				self.tagIndex.objNumStart = self.projectState["dat-progress"]
+				self.parser.outFi.objNumStart = self.projectState["dat-progress"]
+				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+
+			self.projectState["dat-created"] = True
 
 		self.running = True
 
@@ -70,12 +95,28 @@ class MainWindow(QtGui.QMainWindow):
 		print "PausePressed"
 		self.running = False
 
+		objCount1 = self.tagIndex.objs
+		objCount2 = self.parser.outFi.objs
+
+		print "Tag index obj count", objCount1
+		print "Dat rewrite obj count", objCount2
+
+		self.projectState["dat-progress"] = self.tagIndex.objs
+
+		if objCount1 != objCount2:
+			print "Warning: object count mismatch"
+
 	def IdleEvent(self):
 		if self.running:
 			ret = self.parser.DoIncremental()
 			if ret == 1:
+				print "Stopping dat import, all done"
 				self.running = False
+				self.projectState["dat-progress"] = self.tagIndex.objs
+				self.projectState["dat-done"] = self.tagIndex.objs
+
 		time.sleep(0.01)
+
 
 if __name__ == "__main__":
 

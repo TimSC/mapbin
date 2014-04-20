@@ -25,7 +25,7 @@ def StoreFactoryRead(fina, maxCachedPages = 50):
 
 class TagIndex(object):
 
-	def __init__(self, outFina):
+	def __init__(self, outFina, createFile = True):
 		self.nodes = 0
 		self.ways = 0
 		self.relations = 0
@@ -34,17 +34,36 @@ class TagIndex(object):
 		self.lastDisplayCount = 0
 		self.outFina = outFina
 
-		print "Create node tables"
-		self.nodeStartTable, self.nodeStartFile = StoreFactoryCreate(self.outFina+"nodestart.hash", 26, 5000)
-		self.nodeEndTable, self.nodeEndFile = StoreFactoryCreate(self.outFina+"nodeend.hash", 26, 5000)
+		self.objNumStart = None
+		self.objNumEnd = None
 
-		print "Create way tables"
-		self.wayStartTable, self.wayStartFile = StoreFactoryCreate(self.outFina+"waystart.hash", 23, 500)
-		self.wayEndTable, self.wayEndFile = StoreFactoryCreate(self.outFina+"wayend.hash", 23, 500)
+		self.startObjNum = None
+		self.endObjNum = None
 
-		print "Create relation tables"
-		self.relationStartTable, self.relationStartFile = StoreFactoryCreate(self.outFina+"relationstart.hash", 17, 500)
-		self.relationEndTable, self.relationEndFile = StoreFactoryCreate(self.outFina+"relationend.hash", 17, 500)
+		if createFile:
+			print "Create node tables"
+			self.nodeStartTable, self.nodeStartFile = StoreFactoryCreate(self.outFina+"nodestart.hash", 26, 5000)
+			self.nodeEndTable, self.nodeEndFile = StoreFactoryCreate(self.outFina+"nodeend.hash", 26, 5000)
+
+			print "Create way tables"
+			self.wayStartTable, self.wayStartFile = StoreFactoryCreate(self.outFina+"waystart.hash", 23, 500)
+			self.wayEndTable, self.wayEndFile = StoreFactoryCreate(self.outFina+"wayend.hash", 23, 500)
+
+			print "Create relation tables"
+			self.relationStartTable, self.relationStartFile = StoreFactoryCreate(self.outFina+"relationstart.hash", 17, 500)
+			self.relationEndTable, self.relationEndFile = StoreFactoryCreate(self.outFina+"relationend.hash", 17, 500)
+		else:
+			print "Open node tables"
+			self.nodeStartTable, self.nodeStartFile = StoreFactoryRead(self.outFina+"nodestart.hash", 5000)
+			self.nodeEndTable, self.nodeEndFile = StoreFactoryRead(self.outFina+"nodeend.hash", 5000)
+
+			print "Open way tables"
+			self.wayStartTable, self.wayStartFile = StoreFactoryRead(self.outFina+"waystart.hash", 500)
+			self.wayEndTable, self.wayEndFile = StoreFactoryRead(self.outFina+"wayend.hash", 500)
+
+			print "Open relation tables"
+			self.relationStartTable, self.relationStartFile = StoreFactoryRead(self.outFina+"relationstart.hash", 500)
+			self.relationEndTable, self.relationEndFile = StoreFactoryRead(self.outFina+"relationend.hash", 500)
 
 		self.nodeStartTable.verbose = 0
 		self.nodeEndTable.verbose = 0
@@ -92,7 +111,13 @@ class TagIndex(object):
 
 		self.objs += 1
 
-		if name == "node":
+		doInsert = True
+		if self.objNumStart is not None and self.objNumStart > self.objs:
+			doInsert = False
+		if self.objNumEnd is not None and self.objNumEnd < self.objs:
+			doInsert = False
+
+		if doInsert and name == "node":
 			objId = int(attr['id'])
 			objVersion = int(attr['version'])
 
@@ -111,9 +136,7 @@ class TagIndex(object):
 			self.nodeStartTable[objId] = tmpStart
 			self.nodeEndTable[objId] = tmpEnd
 
-			self.nodes += 1
-
-		if name == "way":
+		if doInsert and name == "way":
 			objId = int(attr['id'])
 			objVersion = int(attr['version'])
 
@@ -132,9 +155,7 @@ class TagIndex(object):
 			self.wayStartTable[objId] = tmpStart
 			self.wayEndTable[objId] = tmpEnd
 
-			self.ways += 1
-
-		if name == "relation":
+		if doInsert and name == "relation":
 			objId = int(attr['id'])
 			objVersion = int(attr['version'])
 
@@ -153,6 +174,11 @@ class TagIndex(object):
 			self.relationStartTable[objId] = tmpStart
 			self.relationEndTable[objId] = tmpEnd
 
+		if name == "node":
+			self.nodes += 1
+		if name == "way":
+			self.ways += 1
+		if name == "relation":
 			self.relations += 1
 
 if __name__ == "__main__":
