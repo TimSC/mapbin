@@ -7,6 +7,92 @@ import PySide
 import PySide.QtGui as QtGui
 import PySide.QtCore as QtCore
 
+class DataImport(object):
+	def __init__(self, projectState, workingFolder):
+		self.projectState = projectState
+		self.workingFolder = workingFolder
+		self.running = False
+		self.parser = None
+
+	def __del__(self):
+		self.Pause()
+
+	def Start(self):
+		print "StartPressed"
+		print self.projectState
+
+		if "dat-done" not in self.projectState:
+			self.projectState["dat-done"] = None
+
+		if self.projectState["dat-done"] is not None:
+			print "Data index already done"
+			return
+
+		if self.parser is None:
+			if "dat-created" not in self.projectState:
+				self.projectState["dat-created"] = False
+
+			if not self.projectState["dat-created"]:
+				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=True)
+				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=True)
+				self.parser = xmlprocessing.RewriteXml(self.outfi)
+				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+			else:
+				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=False)
+				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=False)
+
+				self.parser = xmlprocessing.RewriteXml(self.outfi)
+				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+
+				self.tagIndex.objNumStart = self.projectState["dat-progress"]
+				self.parser.outFi.objNumStart = self.projectState["dat-progress"]
+				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+
+			self.projectState["dat-created"] = True
+
+		self.running = True		
+
+	def Pause(self):
+		print "PausePressed"
+		if not self.running:
+			return
+		self.running = False
+
+		objCount1 = self.tagIndex.objs
+		objCount2 = self.parser.outFi.objs
+
+		print "Tag index obj count", objCount1
+		print "Dat rewrite obj count", objCount2
+
+		self.projectState["dat-progress"] = self.tagIndex.objs
+
+		if objCount1 != objCount2:
+			print "Warning: object count mismatch"
+
+	def Clear(self):
+		if self.running:
+			print "Error: Cannot clear while running"
+			return
+		print "Clearing existing data"
+
+		self.projectState["dat-created"] = False
+		self.projectState["dat-progress"] = 0
+		self.projectState["dat-done"] = None
+
+		self.parser = None
+		self.outfi = None
+		self.tagIndex = None
+
+	def Update(self):
+		if self.running:
+			ret = self.parser.DoIncremental()
+			if ret == 1:
+				print "Stopping dat import, all done"
+				self.running = False
+				self.projectState["dat-progress"] = self.tagIndex.objs
+				self.projectState["dat-done"] = self.tagIndex.objs
+
 class MainWindow(QtGui.QMainWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__() 
@@ -23,11 +109,11 @@ class MainWindow(QtGui.QMainWindow):
 			self.projectState = pickle.load(open(self.statusFina, "rt"))
 
 		if "input" not in self.projectState:
-			#self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
+			self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
 			#self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
-			self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
-		self.running = False
-		self.parser = None
+			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
+
+		self.dataImport = DataImport(self.projectState, self.workingFolder)
 
 		self.mainLayout = QtGui.QVBoxLayout()
 
@@ -62,78 +148,16 @@ class MainWindow(QtGui.QMainWindow):
 		pickle.dump(self.projectState, open(self.statusFina, "wt"))
 
 	def StartPressed(self):
-		print "StartPressed"
-		print self.projectState
-
-		if "dat-done" not in self.projectState:
-			self.projectState["dat-done"] = None
-
-		if self.projectState["dat-done"] is not None:
-			print "Data index already done"
-			return
-
-		if self.parser is None:
-			if "dat-created" not in self.projectState:
-				self.projectState["dat-created"] = False
-
-			if not self.projectState["dat-created"]:
-				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=True)
-				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=True)
-				self.parser = xmlprocessing.RewriteXml(self.outfi)
-				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
-				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
-			else:
-				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=False)
-				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=False)
-
-				self.parser = xmlprocessing.RewriteXml(self.outfi)
-				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
-
-				self.tagIndex.objNumStart = self.projectState["dat-progress"]
-				self.parser.outFi.objNumStart = self.projectState["dat-progress"]
-				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
-
-			self.projectState["dat-created"] = True
-
-		self.running = True
+		self.dataImport.Start()
 
 	def PausePressed(self):
-		print "PausePressed"
-		self.running = False
-
-		objCount1 = self.tagIndex.objs
-		objCount2 = self.parser.outFi.objs
-
-		print "Tag index obj count", objCount1
-		print "Dat rewrite obj count", objCount2
-
-		self.projectState["dat-progress"] = self.tagIndex.objs
-
-		if objCount1 != objCount2:
-			print "Warning: object count mismatch"
+		self.dataImport.Pause()
 
 	def ClearPressed(self):
-		if self.running:
-			print "Error: Cannot clear while running"
-			return
-		print "Clearing existing data"
-
-		self.projectState["dat-created"] = False
-		self.projectState["dat-progress"] = 0
-		self.projectState["dat-done"] = None
-
-		self.parser = None
-		self.outfi = None
-		self.tagIndex = None
+		self.dataImport.Clear()
 
 	def IdleEvent(self):
-		if self.running:
-			ret = self.parser.DoIncremental()
-			if ret == 1:
-				print "Stopping dat import, all done"
-				self.running = False
-				self.projectState["dat-progress"] = self.tagIndex.objs
-				self.projectState["dat-done"] = self.tagIndex.objs
+		self.dataImport.Update()
 
 		time.sleep(0.01)
 
