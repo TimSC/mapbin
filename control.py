@@ -7,6 +7,8 @@ import PySide
 import PySide.QtGui as QtGui
 import PySide.QtCore as QtCore
 
+# ************ Data import class ****************
+
 class DataImport(object):
 	def __init__(self, projectState, workingFolder):
 		self.projectState = projectState
@@ -93,6 +95,9 @@ class DataImport(object):
 				self.projectState["dat-progress"] = self.tagIndex.objs
 				self.projectState["dat-done"] = self.tagIndex.objs
 
+
+# ************ Main GUI *******************
+
 class MainWindow(QtGui.QMainWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__() 
@@ -114,24 +119,96 @@ class MainWindow(QtGui.QMainWindow):
 			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)
-		self.dataImport.setFrameShape(QtGui.QFrame.StyledPanel)
-		self.mainLayout.addWidget(self.dataImport)
 
 		self.mainLayout = QtGui.QVBoxLayout()
 
+		# Data frame
 		self.dataImportFrame = QtGui.QFrame()
+		self.dataImportFrame.setFrameShape(QtGui.QFrame.StyledPanel)
+		self.dataImportLayout = QtGui.QHBoxLayout(self.dataImportFrame)
+		self.mainLayout.addWidget(self.dataImportFrame)
 
-		self.startButton = QtGui.QPushButton("Start")
-		self.startButton.pressed.connect(self.StartPressed)
-		self.mainLayout.addWidget(self.startButton)
+		# ******* Data import ********
+		self.dataImportLabel = QtGui.QLabel("Data")
+		self.dataImportLayout.addWidget(self.dataImportLabel)
 
-		self.pauseButton = QtGui.QPushButton("Pause")
-		self.pauseButton.pressed.connect(self.PausePressed)
-		self.mainLayout.addWidget(self.pauseButton)
+		self.dataStartButton = QtGui.QPushButton("Start")
+		self.dataStartButton.pressed.connect(self.DataStartPressed)
+		self.dataImportLayout.addWidget(self.dataStartButton)
 
-		self.clearButton = QtGui.QPushButton("Clear")
-		self.clearButton.pressed.connect(self.ClearPressed)
-		self.mainLayout.addWidget(self.clearButton)
+		self.dataPauseButton = QtGui.QPushButton("Pause")
+		self.dataPauseButton.pressed.connect(self.DataPausePressed)
+		self.dataImportLayout.addWidget(self.dataPauseButton)
+
+		self.dataClearButton = QtGui.QPushButton("Clear")
+		self.dataClearButton.pressed.connect(self.DataClearPressed)
+		self.dataImportLayout.addWidget(self.dataClearButton)
+
+		# Chilren index frame
+		self.chImportFrame = QtGui.QFrame()
+		self.chImportFrame.setFrameShape(QtGui.QFrame.StyledPanel)
+		self.chImportLayout = QtGui.QHBoxLayout(self.chImportFrame)
+		self.mainLayout.addWidget(self.chImportFrame)
+
+		# ********* Children index *********
+		self.chImportLabel = QtGui.QLabel("Children index")
+		self.chImportLayout.addWidget(self.chImportLabel)
+
+		self.chStartButton = QtGui.QPushButton("Start")
+		self.chStartButton.pressed.connect(self.ChStartPressed)
+		self.chImportLayout.addWidget(self.chStartButton)
+
+		self.chPauseButton = QtGui.QPushButton("Pause")
+		self.chPauseButton.pressed.connect(self.ChPausePressed)
+		self.chImportLayout.addWidget(self.chPauseButton)
+
+		self.chClearButton = QtGui.QPushButton("Clear")
+		self.chClearButton.pressed.connect(self.ChClearPressed)
+		self.chImportLayout.addWidget(self.chClearButton)
+
+		# Spatial index frame
+		self.spImportFrame = QtGui.QFrame()
+		self.spImportFrame.setFrameShape(QtGui.QFrame.StyledPanel)
+		self.spImportLayout = QtGui.QHBoxLayout(self.spImportFrame)
+		self.mainLayout.addWidget(self.spImportFrame)
+
+		# ********* Spatial index **********
+		self.spImportLabel = QtGui.QLabel("Spatial index")
+		self.spImportLayout.addWidget(self.spImportLabel)
+
+		self.spStartButton = QtGui.QPushButton("Start")
+		self.spStartButton.pressed.connect(self.SpStartPressed)
+		self.spImportLayout.addWidget(self.spStartButton)
+
+		self.spPauseButton = QtGui.QPushButton("Pause")
+		self.spPauseButton.pressed.connect(self.SpPausePressed)
+		self.spImportLayout.addWidget(self.spPauseButton)
+
+		self.spClearButton = QtGui.QPushButton("Clear")
+		self.spClearButton.pressed.connect(self.SpClearPressed)
+		self.spImportLayout.addWidget(self.spClearButton)
+
+		# Version index frame
+		self.verImportFrame = QtGui.QFrame()
+		self.verImportFrame.setFrameShape(QtGui.QFrame.StyledPanel)
+		self.verImportLayout = QtGui.QHBoxLayout(self.verImportFrame)
+		self.mainLayout.addWidget(self.verImportFrame)
+
+		# ******** Version index ******
+		self.verImportLabel = QtGui.QLabel("Version index")
+		self.verImportLayout.addWidget(self.verImportLabel)
+
+		self.verStartButton = QtGui.QPushButton("Start")
+		self.verStartButton.pressed.connect(self.VerStartPressed)
+		self.verImportLayout.addWidget(self.verStartButton)
+
+		self.verPauseButton = QtGui.QPushButton("Pause")
+		self.verPauseButton.pressed.connect(self.VerPausePressed)
+		self.verImportLayout.addWidget(self.verPauseButton)
+
+		self.verClearButton = QtGui.QPushButton("Clear")
+		self.verClearButton.pressed.connect(self.VerClearPressed)
+		self.verImportLayout.addWidget(self.verClearButton)
 
 		centralWidget = QtGui.QWidget()
 		centralWidget.setLayout(self.mainLayout)
@@ -151,14 +228,41 @@ class MainWindow(QtGui.QMainWindow):
 		print self.projectState
 		pickle.dump(self.projectState, open(self.statusFina, "wt"))
 
-	def StartPressed(self):
+	def DataStartPressed(self):
 		self.dataImport.Start()
 
-	def PausePressed(self):
+	def DataPausePressed(self):
 		self.dataImport.Pause()
 
-	def ClearPressed(self):
+	def DataClearPressed(self):
 		self.dataImport.Clear()
+
+	def ChStartPressed(self):
+		pass
+
+	def ChPausePressed(self):
+		pass
+
+	def ChClearPressed(self):
+		pass
+
+	def SpStartPressed(self):
+		pass
+
+	def SpPausePressed(self):
+		pass
+
+	def SpClearPressed(self):
+		pass
+
+	def VerStartPressed(self):
+		pass
+
+	def VerPausePressed(self):
+		pass
+
+	def VerClearPressed(self):
+		pass
 
 	def IdleEvent(self):
 		self.dataImport.Update()
