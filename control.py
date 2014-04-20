@@ -23,7 +23,9 @@ class MainWindow(QtGui.QMainWindow):
 			self.projectState = pickle.load(open(self.statusFina, "rt"))
 
 		if "input" not in self.projectState:
-			self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
+			#self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
+			#self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
+			self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 		self.running = False
 		self.parser = None
 
@@ -36,6 +38,10 @@ class MainWindow(QtGui.QMainWindow):
 		self.pauseButton = QtGui.QPushButton("Pause")
 		self.pauseButton.pressed.connect(self.PausePressed)
 		self.mainLayout.addWidget(self.pauseButton)
+
+		self.clearButton = QtGui.QPushButton("Clear")
+		self.clearButton.pressed.connect(self.ClearPressed)
+		self.mainLayout.addWidget(self.clearButton)
 
 		centralWidget = QtGui.QWidget()
 		centralWidget.setLayout(self.mainLayout)
@@ -105,6 +111,20 @@ class MainWindow(QtGui.QMainWindow):
 
 		if objCount1 != objCount2:
 			print "Warning: object count mismatch"
+
+	def ClearPressed(self):
+		if self.running:
+			print "Error: Cannot clear while running"
+			return
+		print "Clearing existing data"
+
+		self.projectState["dat-created"] = False
+		self.projectState["dat-progress"] = 0
+		self.projectState["dat-done"] = None
+
+		self.parser = None
+		self.outfi = None
+		self.tagIndex = None
 
 	def IdleEvent(self):
 		if self.running:
