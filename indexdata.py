@@ -37,9 +37,6 @@ class TagIndex(object):
 		self.objNumStart = None
 		self.objNumEnd = None
 
-		self.startObjNum = None
-		self.endObjNum = None
-
 		if createFile:
 			print "Create node tables"
 			self.nodeStartTable, self.nodeStartFile = StoreFactoryCreate(self.outFina+"nodestart.hash", 32, 5000)

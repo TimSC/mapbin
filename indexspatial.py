@@ -5,6 +5,30 @@ from pycontainers import compressedfile, qsfs
 
 #UK dump size nodes=33017987 ways=4040979 relations=80851
 
+def StoreFactoryCreate(fina):
+	try:
+		os.unlink(sys.argv[2])
+	except:
+		pass
+
+	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(fina, createFile=True), initFs = 1, 
+		deviceSize = 10000 * 1024 * 1024, 
+		maxFileSize = 10 * 1024 * 1024,
+		blockSize = 100 * 1024,
+		maxFiles = 5000000)
+	print outFileSystem.statvfs("/")
+
+	tileStorage = TileStorage(outFileSystem)
+	return tileStorage
+
+def StoreFactoryOpen(fina):
+
+	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(fina, createFile=False), initFs = 0)
+	print outFileSystem.statvfs("/")
+
+	tileStorage = TileStorage(outFileSystem)
+	return tileStorage
+
 class TileStorage(object):
 	def __init__(self, outFileSystem):
 		self.outFileSystem = outFileSystem
@@ -70,19 +94,33 @@ class TileStorage(object):
 		#if numEntries >= 100 and currentZoom < self.maxZoom:
 		#	self.outFileSystem.open(fullFile, "w")
 
+	def flush(self):
+		self.outFileSystem.flush()
+
 class TagIndex(object):
 
-	def __init__(self, outfi):
+	def __init__(self, fina, createFile=True):
 		self.nodes = 0
 		self.ways = 0
 		self.relations = 0
 		self.objs = 0
 		self.lastDisplayTime = time.time()
 		self.lastDisplayCount = 0
-		self.outfi = outfi
+
+		self.objNumStart = None
+		self.objNumEnd = None
+
+		if createFile:
+			self.outfi = StoreFactoryCreate(fina)
+		else:
+			self.outfi = StoreFactoryOpen(fina)
 
 	def __del__(self):
 		print "Flushing"
+		self.flush()
+
+	def flush(self):
+		self.outfi.flush()
 
 	def TagLimitCallback(self, name, depth, attr, childTags, childMembers):
 		if depth != 2:
@@ -94,21 +132,30 @@ class TagIndex(object):
 			self.lastDisplayTime = time.time()
 			print self.nodes, self.ways, self.relations, self.objs, "("+str(rate)+" obj per sec)"
 
-		self.objs += 1
+
+		doInsert = True
+		if self.objNumStart is not None and self.objNumStart > self.objs:
+			doInsert = False
+		if self.objNumEnd is not None and self.objNumEnd < self.objs:
+			doInsert = False
 
 		if name == "node":
 			self.nodes += 1
-			lat = float(attr['lat'])
-			lon = float(attr['lon'])
-			objId = int(attr['id'])
-			version = int(attr['version'])
-			self.outfi.Add(lat, lon, objId, version)
+			if doInsert:
+				lat = float(attr['lat'])
+				lon = float(attr['lon'])
+				objId = int(attr['id'])
+				version = int(attr['version'])
+				self.outfi.Add(lat, lon, objId, version)
 
 		if name == "way":
 			self.ways += 1
 
 		if name == "relation":
 			self.relations += 1
+
+		self.objs += 1
+
 
 if __name__ == "__main__":
 	if len(sys.argv) < 2:
@@ -120,20 +167,7 @@ if __name__ == "__main__":
 		exit(1)
 
 	infi = bz2.BZ2File(sys.argv[1])
-	try:
-		os.unlink(sys.argv[2])
-	except:
-		pass
-
-	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(sys.argv[2]), initFs = 1, 
-		deviceSize = 10000 * 1024 * 1024, 
-		maxFileSize = 10 * 1024 * 1024,
-		blockSize = 100 * 1024,
-		maxFiles = 5000000)
-	print outFileSystem.statvfs("/")
-
-	tileStorage = TileStorage(outFileSystem)
-	tagIndex = TagIndex(tileStorage)
+	tagIndex = TagIndex(sys.argv[2])
 
 	parser = xmlprocessing.ReadXml()
 	parser.TagLimitCallback = tagIndex.TagLimitCallback

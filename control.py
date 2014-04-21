@@ -1,7 +1,7 @@
 #!/usr/bin/python
  
 import sys, os, pickle, time, bz2
-import indexdata, xmlprocessing, indexchildren
+import indexdata, xmlprocessing, indexchildren, indexspatial, indexversion
 from pycontainers import compressedfile, hashtable
 import PySide
 import PySide.QtGui as QtGui
@@ -80,8 +80,10 @@ class DataImport(object):
 		if objCount1 != objCount2:
 			print "Warning: object count mismatch"
 
+		print "Flushing index"
 		self.tagIndex.flush()
 		self.parser.outFi.flush()
+		print "done"
 
 	def Clear(self):
 		if self.running:
@@ -114,15 +116,24 @@ class DataImport(object):
 				self.tagIndex.flush()
 				self.parser.outFi.flush()
 
-# ************ Children index class ****************
+# ************ index class ****************
 
-class ChildrenImport(object):
-	def __init__(self, projectState, workingFolder):
+class MultiImport(object):
+	def __init__(self, projectState, workingFolder, prefix, descriptiveName, ParserFactory, IndexFactory, indexArgs):
 		self.projectState = projectState
 		self.workingFolder = workingFolder
 		self.running = False
 		self.parser = None
 		self.tagIndex = None
+
+		self.createdKey = prefix+"-created"
+		self.progressKey = prefix+"-progress"
+		self.doneKey = prefix+"-done"
+		self.prefix = prefix
+		self.descriptiveName = descriptiveName
+		self.ParserFactory = ParserFactory
+		self.IndexFactory = IndexFactory
+		self.indexArgs = indexArgs
 
 	def __del__(self):
 		self.Pause()
@@ -135,34 +146,34 @@ class ChildrenImport(object):
 		print "StartPressed"
 		print self.projectState
 
-		if "ch-done" not in self.projectState:
-			self.projectState["ch-done"] = None
-		if "ch-progress" not in self.projectState:
-			self.projectState["ch-progress"] = None
+		if self.doneKey not in self.projectState:
+			self.projectState[self.doneKey] = None
+		if self.progressKey not in self.projectState:
+			self.projectState[self.progressKey] = None
 
-		if self.projectState["ch-done"] is not None:
-			print "Children index already done"
+		if self.projectState[self.doneKey] is not None:
+			print self.descriptiveName,"already done"
 			return
 
 		if self.parser is None:
-			if "ch-created" not in self.projectState:
-				self.projectState["ch-created"] = False
+			if self.createdKey not in self.projectState:
+				self.projectState[self.createdKey] = False
 
-			if not self.projectState["ch-created"]:
-				self.tagIndex = indexchildren.TagIndex(self.workingFolder+"/ch", createFile=True)
-				self.parser = xmlprocessing.ReadXml()
+			if not self.projectState[self.createdKey]:
+				self.tagIndex = self.IndexFactory(*self.indexArgs, createFile=True)
+				self.parser = self.ParserFactory()
 				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
 				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
+
+				self.projectState[self.createdKey] = True
 			else:
-				self.tagIndex = indexchildren.TagIndex(self.workingFolder+"/ch", createFile=False)
+				self.tagIndex = self.IndexFactory(*self.indexArgs, createFile=False)
 
-				self.parser = xmlprocessing.ReadXml()
+				self.parser = self.ParserFactory()
 				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
 
-				self.tagIndex.objNumStart = self.projectState["ch-progress"]
+				self.tagIndex.objNumStart = self.projectState[self.progressKey]
 				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
-
-			self.projectState["ch-created"] = True
 
 		self.running = True
 
@@ -176,20 +187,22 @@ class ChildrenImport(object):
 
 		print "Tag index obj count", objCount1
 
-		if self.tagIndex.objs > self.projectState["ch-progress"]:
-			self.projectState["ch-progress"] = self.tagIndex.objs
+		if self.tagIndex.objs > self.projectState[self.progressKey]:
+			self.projectState[self.progressKey] = self.tagIndex.objs
 
+		print "Flushing index"
 		self.tagIndex.flush()
+		print "done"
 
 	def Clear(self):
 		if self.running:
 			print "Error: Cannot clear while running"
 			return
-		print "Clearing existing children index"
+		print "Clearing existing", self.descriptiveName
 
-		self.projectState["ch-created"] = False
-		self.projectState["ch-progress"] = 0
-		self.projectState["ch-done"] = None
+		self.projectState[self.createdKey] = False
+		self.projectState[self.progressKey] = 0
+		self.projectState[self.doneKey] = None
 
 		self.parser = None
 		self.outfi = None
@@ -200,14 +213,14 @@ class ChildrenImport(object):
 			try:
 				ret = self.parser.DoIncremental()
 			except Exception as err:
-				print "ch import failed", err
+				print self.descriptiveName, "import failed", err
 				self.running = False
 				ret = 0
 			if ret == 1:
-				print "Stopping ch import, all done"
+				print "Stopping",self.descriptiveName,"import, all done"
 				self.running = False
-				self.projectState["ch-progress"] = self.tagIndex.objs
-				self.projectState["ch-done"] = self.tagIndex.objs
+				self.projectState[self.progressKey] = self.tagIndex.objs
+				self.projectState[self.doneKey] = self.tagIndex.objs
 				self.tagIndex.flush()
 
 # ************ Main GUI *******************
@@ -233,7 +246,15 @@ class MainWindow(QtGui.QMainWindow):
 			self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)
-		self.childrenImport = ChildrenImport(self.projectState, self.workingFolder)
+		self.childrenImport = MultiImport(self.projectState, self.workingFolder, 
+			"ch", "children index", xmlprocessing.ReadXml, indexchildren.TagIndex,
+			[self.workingFolder+"/ch"])
+		self.spatialImport = MultiImport(self.projectState, self.workingFolder, 
+			"sp", "spatial index", xmlprocessing.ReadXml, indexspatial.TagIndex,
+			[self.workingFolder+"/sp"])
+		self.versionImport = MultiImport(self.projectState, self.workingFolder, 
+			"ver", "version index", xmlprocessing.ReadXml, indexversion.TagIndex,
+			[self.workingFolder+"/ver"])
 
 		self.mainLayout = QtGui.QVBoxLayout()
 
@@ -362,26 +383,28 @@ class MainWindow(QtGui.QMainWindow):
 		self.childrenImport.Clear()
 
 	def SpStartPressed(self):
-		pass
+		self.spatialImport.Start()
 
 	def SpPausePressed(self):
-		pass
+		self.spatialImport.Pause()
 
 	def SpClearPressed(self):
-		pass
+		self.spatialImport.Clear()
 
 	def VerStartPressed(self):
-		pass
+		self.versionImport.Start()
 
 	def VerPausePressed(self):
-		pass
+		self.versionImport.Pause()
 
 	def VerClearPressed(self):
-		pass
+		self.versionImport.Clear()
 
 	def IdleEvent(self):
 		self.dataImport.Update()
 		self.childrenImport.Update()
+		self.spatialImport.Update()
+		self.versionImport.Update()
 		time.sleep(0.01)
 
 
