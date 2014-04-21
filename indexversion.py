@@ -41,13 +41,13 @@ class TagIndex(object):
 
 		self.prefix = prefix
 		if createFile:
-			self.nodeParentStore, self.compFiN = StoreFactoryCreate(self.prefix+".vnode", 32, 5000)
-			self.wayParentStore, self.compFiW = StoreFactoryCreate(self.prefix+".vway", 28, 5000)
-			self.relationParentStore, self.compFiR = StoreFactoryCreate(self.prefix+".vrelation", 22, 5000)
+			self.nodeParentStore, self.compFiN = StoreFactoryCreate(self.prefix+".vnode", 32, 500)
+			self.wayParentStore, self.compFiW = StoreFactoryCreate(self.prefix+".vway", 28, 50)
+			self.relationParentStore, self.compFiR = StoreFactoryCreate(self.prefix+".vrelation", 22, 50)
 		else:
-			self.nodeParentStore, self.compFiN = StoreFactoryOpen(self.prefix+".vnode", 32, 5000)
-			self.wayParentStore, self.compFiW = StoreFactoryOpen(self.prefix+".vway", 28, 5000)
-			self.relationParentStore, self.compFiR = StoreFactoryOpen(self.prefix+".vrelation", 22, 5000)
+			self.nodeParentStore, self.compFiN = StoreFactoryOpen(self.prefix+".vnode", 32, 500)
+			self.wayParentStore, self.compFiW = StoreFactoryOpen(self.prefix+".vway", 28, 50)
+			self.relationParentStore, self.compFiR = StoreFactoryOpen(self.prefix+".vrelation", 22, 50)
 
 	def __del__(self):
 		print "Flushing"

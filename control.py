@@ -230,6 +230,8 @@ class MainWindow(QtGui.QMainWindow):
 		super(MainWindow, self).__init__() 
 
 		self.workingFolder = "dat"
+		if len(sys.argv) > 1:
+			self.workingFolder = sys.argv[1]
 
 		if not os.path.exists(self.workingFolder):
 			os.mkdir(self.workingFolder)
@@ -239,6 +241,9 @@ class MainWindow(QtGui.QMainWindow):
 			self.projectState = {}
 		else:
 			self.projectState = pickle.load(open(self.statusFina, "rt"))
+
+		if "input" not in self.projectState and len(sys.argv) > 2:
+			self.projectState["input"] = sys.argv[2]
 
 		if "input" not in self.projectState:
 			#self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"

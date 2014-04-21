@@ -39,28 +39,28 @@ class TagIndex(object):
 
 		if createFile:
 			print "Create node tables"
-			self.nodeStartTable, self.nodeStartFile = StoreFactoryCreate(self.outFina+"nodestart.hash", 32, 5000)
-			self.nodeEndTable, self.nodeEndFile = StoreFactoryCreate(self.outFina+"nodeend.hash", 32, 5000)
+			self.nodeStartTable, self.nodeStartFile = StoreFactoryCreate(self.outFina+"nodestart.hash", 32, 500)
+			self.nodeEndTable, self.nodeEndFile = StoreFactoryCreate(self.outFina+"nodeend.hash", 32, 500)
 
 			print "Create way tables"
-			self.wayStartTable, self.wayStartFile = StoreFactoryCreate(self.outFina+"waystart.hash", 28, 500)
-			self.wayEndTable, self.wayEndFile = StoreFactoryCreate(self.outFina+"wayend.hash", 28, 500)
+			self.wayStartTable, self.wayStartFile = StoreFactoryCreate(self.outFina+"waystart.hash", 28, 50)
+			self.wayEndTable, self.wayEndFile = StoreFactoryCreate(self.outFina+"wayend.hash", 28, 50)
 
 			print "Create relation tables"
-			self.relationStartTable, self.relationStartFile = StoreFactoryCreate(self.outFina+"relationstart.hash", 22, 500)
-			self.relationEndTable, self.relationEndFile = StoreFactoryCreate(self.outFina+"relationend.hash", 22, 500)
+			self.relationStartTable, self.relationStartFile = StoreFactoryCreate(self.outFina+"relationstart.hash", 22, 50)
+			self.relationEndTable, self.relationEndFile = StoreFactoryCreate(self.outFina+"relationend.hash", 22, 50)
 		else:
 			print "Open node tables"
-			self.nodeStartTable, self.nodeStartFile = StoreFactoryRead(self.outFina+"nodestart.hash", 5000)
-			self.nodeEndTable, self.nodeEndFile = StoreFactoryRead(self.outFina+"nodeend.hash", 5000)
+			self.nodeStartTable, self.nodeStartFile = StoreFactoryRead(self.outFina+"nodestart.hash", 500)
+			self.nodeEndTable, self.nodeEndFile = StoreFactoryRead(self.outFina+"nodeend.hash", 500)
 
 			print "Open way tables"
-			self.wayStartTable, self.wayStartFile = StoreFactoryRead(self.outFina+"waystart.hash", 500)
-			self.wayEndTable, self.wayEndFile = StoreFactoryRead(self.outFina+"wayend.hash", 500)
+			self.wayStartTable, self.wayStartFile = StoreFactoryRead(self.outFina+"waystart.hash", 50)
+			self.wayEndTable, self.wayEndFile = StoreFactoryRead(self.outFina+"wayend.hash", 50)
 
 			print "Open relation tables"
-			self.relationStartTable, self.relationStartFile = StoreFactoryRead(self.outFina+"relationstart.hash", 500)
-			self.relationEndTable, self.relationEndFile = StoreFactoryRead(self.outFina+"relationend.hash", 500)
+			self.relationStartTable, self.relationStartFile = StoreFactoryRead(self.outFina+"relationstart.hash", 50)
+			self.relationEndTable, self.relationEndFile = StoreFactoryRead(self.outFina+"relationend.hash", 50)
 
 		self.nodeStartTable.verbose = 0
 		self.nodeEndTable.verbose = 0
