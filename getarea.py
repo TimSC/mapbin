@@ -32,7 +32,6 @@ class OsmObjectStore(object):
 		if startPos is None or endPos is None:
 			return None
 
-		print startPos, endPos, startPos-endPos
 		self.mainData.seek(startPos)
 		rawStr = self.mainData.read(endPos - startPos)
 		return rawStr.decode('utf-8')
@@ -451,9 +450,9 @@ if __name__=="__main__":
 	#getArea.GetArea([-0.5142975,51.2413932,-0.4645157,51.2738368], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
 	#getArea.GetTile(1021, 683, 11, bz2.BZ2File("out.osm.bz2", "w"))
 
-	#N mairana
-	#getArea.GetArea([145.6409693,15.0891509,145.8704831,15.297759], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
-	getArea.GetTile(1852, 936, 11, bz2.BZ2File("out.osm.bz2", "w"))
+	#northern_mariana_islands
+	getArea.GetArea([145.6409693,15.0891509,145.8704831,15.297759], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
+	#getArea.GetTile(1852, 936, 11, bz2.BZ2File("out.osm.bz2", "w"))
 
 	#MultiTileSave(getArea, [-9.4042969,49.3823728,2.7246094,62.8751884], 11)
 	

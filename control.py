@@ -43,6 +43,7 @@ class DataImport(object):
 
 			if not self.projectState["dat-created"]:
 				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=True)
+
 				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=True)
 				self.parser = xmlprocessing.RewriteXml(self.outfi, self.tagIndex.TagLimitCallback, 
 					self.tagIndex.CurrentObjectWantedCheck, self.tagIndex.CurrentPosFunc)
@@ -51,6 +52,9 @@ class DataImport(object):
 				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
 			else:
 				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=False)
+				self.outfi.seek(0, 2) #Seek to end
+				print "Resume at file pos", self.outfi.tell()
+
 				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=False)
 
 				self.parser = xmlprocessing.RewriteXml(self.outfi, self.tagIndex.TagLimitCallback, 

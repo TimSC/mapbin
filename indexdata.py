@@ -128,8 +128,8 @@ class TagIndex(object):
 			tmpStart[objVersion] = start
 			tmpEnd[objVersion] = end
 
-			self.nodeStartTable[objId] = start
-			self.nodeEndTable[objId] = end
+			self.nodeStartTable[objId] = tmpStart
+			self.nodeEndTable[objId] = tmpEnd
 
 		if doInsert and name == "way":
 			objId = int(attr['id'])
