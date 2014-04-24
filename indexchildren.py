@@ -33,6 +33,7 @@ class TagIndex(object):
 		self.objs = 0
 		self.lastDisplayTime = time.time()
 		self.lastDisplayCount = 0
+		self.childCount = 0
 
 		self.objNumStart = None
 		self.objNumEnd = None
@@ -93,10 +94,13 @@ class TagIndex(object):
 			doInsert = False
 
 		if time.time() - self.lastDisplayTime > 1.:
-			rate = (self.objs - self.lastDisplayCount) / (time.time() - self.lastDisplayTime)
+			elapseTime = (time.time() - self.lastDisplayTime)
+			rate = (self.objs - self.lastDisplayCount) / elapseTime
 			self.lastDisplayCount = self.objs
 			self.lastDisplayTime = time.time()
 			print self.nodes, self.ways, self.relations, self.objs, "("+str(rate)+" obj per sec)"
+			print self.childCount, float(self.childCount) / elapseTime
+			self.childCount = 0
 
 		if self.objs % 100000 == 0:
 			print "Flushing"
@@ -114,6 +118,7 @@ class TagIndex(object):
 				version = int(attr['version'])
 				for chType, chRef, chRole in childMembers:
 					self.AddParent(chType, chRef, name, objId, version)
+					self.childCount += 1
 				
 			self.ways += 1
 
@@ -124,6 +129,7 @@ class TagIndex(object):
 				version = int(attr['version'])
 				for chType, chRef, chRole in childMembers:
 					self.AddParent(chType, chRef, name, objId, version)
+					self.childCount += 1
 
 			self.relations += 1
 

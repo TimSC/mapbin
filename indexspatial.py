@@ -12,8 +12,8 @@ def StoreFactoryCreate(fina):
 		pass
 
 	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(fina, createFile=True), initFs = 1, 
-		deviceSize = 10000 * 1024 * 1024, 
-		maxFileSize = 10 * 1024 * 1024,
+		deviceSize = 1024 * 1024 * 1024 * 1024, #1Tb
+		maxFileSize = 20 * 1024 * 1024,
 		blockSize = 100 * 1024,
 		maxFiles = 5000000)
 	print outFileSystem.statvfs("/")

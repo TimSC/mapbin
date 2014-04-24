@@ -33,8 +33,10 @@ class TagIndex(object):
 		self.lastDisplayTime = time.time()
 		self.lastDisplayCount = 0
 		self.outFina = outFina
+		self.pos = 0
 
 		self.objNumStart = None
+		self.objNumStartPos = 0
 		self.objNumEnd = None
 
 		if createFile:
@@ -92,9 +94,17 @@ class TagIndex(object):
 		del self.relationStartTable
 		del self.relationEndTable
 
-	def TagLimitCallback(self, name, depth, attr, start, end):
+	def CurrentPosFunc(self, currentPos):
+		self.pos = currentPos
+		print "CurrentPosFunc", currentPos
+
+	def TagLimitCallback(self, name, depth, attr, length):
 		if depth != 2:
 			return
+
+		if self.objs == self.objNumStart:
+			#Resume position in file
+			self.pos = self.objNumStartPos
 
 		if time.time() - self.lastDisplayTime > 1.:
 			rate = (self.objs - self.lastDisplayCount) / (time.time() - self.lastDisplayTime)
@@ -106,13 +116,7 @@ class TagIndex(object):
 				print "page reads", self.nodeStartFile.cacheReads, self.nodeStartFile.diskReads
 				print "page writes", self.nodeStartFile.cacheWrites, self.nodeStartFile.diskWrites
 
-		self.objs += 1
-
-		doInsert = True
-		if self.objNumStart is not None and self.objNumStart > self.objs:
-			doInsert = False
-		if self.objNumEnd is not None and self.objNumEnd < self.objs:
-			doInsert = False
+		doInsert = self.CurrentObjectWantedCheck()
 
 		if doInsert and name == "node":
 			objId = int(attr['id'])
@@ -127,8 +131,8 @@ class TagIndex(object):
 			else:
 				tmpEnd = {}
 
-			tmpStart[objVersion] = start
-			tmpEnd[objVersion] = end
+			tmpStart[objVersion] = self.pos
+			tmpEnd[objVersion] = self.pos + length
 
 			self.nodeStartTable[objId] = tmpStart
 			self.nodeEndTable[objId] = tmpEnd
@@ -146,8 +150,8 @@ class TagIndex(object):
 			else:
 				tmpEnd = {}
 
-			tmpStart[objVersion] = start
-			tmpEnd[objVersion] = end
+			tmpStart[objVersion] = self.pos
+			tmpEnd[objVersion] = self.pos + length
 
 			self.wayStartTable[objId] = tmpStart
 			self.wayEndTable[objId] = tmpEnd
@@ -165,8 +169,8 @@ class TagIndex(object):
 			else:
 				tmpEnd = {}
 
-			tmpStart[objVersion] = start
-			tmpEnd[objVersion] = end
+			tmpStart[objVersion] = self.pos
+			tmpEnd[objVersion] = self.pos + length
 
 			self.relationStartTable[objId] = tmpStart
 			self.relationEndTable[objId] = tmpEnd
@@ -177,6 +181,17 @@ class TagIndex(object):
 			self.ways += 1
 		if name == "relation":
 			self.relations += 1
+
+		self.objs += 1
+		self.pos += length
+
+	def CurrentObjectWantedCheck(self):
+		doInsert = True
+		if self.objNumStart is not None and self.objNumStart > self.objs:
+			doInsert = False
+		if self.objNumEnd is not None and self.objNumEnd < self.objs:
+			doInsert = False
+		return doInsert
 
 	def flush(self):
 		self.nodeStartTable.flush()
@@ -206,8 +221,7 @@ if __name__ == "__main__":
 
 	tagIndex = TagIndex(sys.argv[2])
 
-	parser = xmlprocessing.RewriteXml(outfi)
-	parser.TagLimitCallback = tagIndex.TagLimitCallback
+	parser = xmlprocessing.RewriteXml(outfi, tagIndex.TagLimitCallback, tagIndex.CurrentObjectWantedCheck, tagIndex.CurrentPosFunc)
 	parser.ParseFile(infi)
 
 	#print len(tagIndex.nodeStartTable)	

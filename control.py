@@ -44,18 +44,21 @@ class DataImport(object):
 			if not self.projectState["dat-created"]:
 				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=True)
 				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=True)
-				self.parser = xmlprocessing.RewriteXml(self.outfi)
+				self.parser = xmlprocessing.RewriteXml(self.outfi, self.tagIndex.TagLimitCallback, 
+					self.tagIndex.CurrentObjectWantedCheck, self.tagIndex.CurrentPosFunc)
 				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+				self.parser.CurrentObjectWantedCheck = self.tagIndex.CurrentObjectWantedCheck
 				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
 			else:
 				self.outfi = compressedfile.CompressedFile(self.workingFolder+"/data", createFile=False)
 				self.tagIndex = indexdata.TagIndex(self.workingFolder+"/data", createFile=False)
 
-				self.parser = xmlprocessing.RewriteXml(self.outfi)
-				self.parser.TagLimitCallback = self.tagIndex.TagLimitCallback
+				self.parser = xmlprocessing.RewriteXml(self.outfi, self.tagIndex.TagLimitCallback, 
+					self.tagIndex.CurrentObjectWantedCheck, self.tagIndex.CurrentPosFunc)
 
 				self.tagIndex.objNumStart = self.projectState["dat-progress"]
-				self.parser.outFi.objNumStart = self.projectState["dat-progress"]
+				self.tagIndex.objNumStartPos = self.projectState["dat-pos"]
+				#self.parser.outFi.objNumStart = self.projectState["dat-progress"]
 				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
 
 			self.projectState["dat-created"] = True
@@ -69,16 +72,12 @@ class DataImport(object):
 		self.running = False
 
 		objCount1 = self.tagIndex.objs
-		objCount2 = self.parser.outFi.objs
 
 		print "Tag index obj count", objCount1
-		print "Dat rewrite obj count", objCount2
 
 		if self.tagIndex.objs > self.projectState["dat-progress"]:
 			self.projectState["dat-progress"] = self.tagIndex.objs
-
-		if objCount1 != objCount2:
-			print "Warning: object count mismatch"
+			self.projectState["dat-pos"] = self.tagIndex.pos
 
 		print "Flushing index"
 		self.tagIndex.flush()
@@ -134,6 +133,7 @@ class MultiImport(object):
 		self.ParserFactory = ParserFactory
 		self.IndexFactory = IndexFactory
 		self.indexArgs = indexArgs
+		self.xmlBuffSize = 1000000
 
 	def __del__(self):
 		self.Pause()
@@ -211,7 +211,7 @@ class MultiImport(object):
 	def Update(self):
 		if self.running:
 			try:
-				ret = self.parser.DoIncremental()
+				ret = self.parser.DoIncremental(self.xmlBuffSize)
 			except Exception as err:
 				print self.descriptiveName, "import failed", err
 				self.running = False
@@ -247,13 +247,14 @@ class MainWindow(QtGui.QMainWindow):
 
 		if "input" not in self.projectState:
 			#self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
-			#self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
-			self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
+			self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
+			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)
 		self.childrenImport = MultiImport(self.projectState, self.workingFolder, 
 			"ch", "children index", xmlprocessing.ReadXml, indexchildren.TagIndex,
 			[self.workingFolder+"/ch"])
+		self.childrenImport.xmlBuffSize = 100000
 		self.spatialImport = MultiImport(self.projectState, self.workingFolder, 
 			"sp", "spatial index", xmlprocessing.ReadXml, indexspatial.TagIndex,
 			[self.workingFolder+"/sp"])

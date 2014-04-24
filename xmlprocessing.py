@@ -27,10 +27,10 @@ class ReadXml(object):
 		fi.seek(0)
 		self.incremental = fi
 
-	def DoIncremental(self):
+	def DoIncremental(self, buffSize = 1000000):
 		if self.incremental is None:
 			raise RuntimeError("Incremental not started")
-		buff = self.incremental.read(1000000)
+		buff = self.incremental.read(buffSize)
 		if len(buff) > 0:
 			self.parser.Parse(buff, 0)
 			return 0 #Not done
@@ -69,30 +69,8 @@ class ReadXml(object):
 		self.tags.pop()
 		self.attr.pop()
 
-class OutFileControl(object):
-	def __init__(self, outFi):
-		self.outFi = outFi
-		self.objs = 0
-		self.startObjNum = None
-		self.endObjNum = None
-
-	def flush(self):
-		self.outFi.flush()
-
-	def write(self, dat):
-		if self.startObjNum is not None:
-			if self.obj < self.startObjNum: return
-		if self.endObjNum is not None:
-			if self.obj > self.endObjNum: return
- 
-		self.outFi.write(dat)
-
-	def depthlimit(self, depth):
-		if depth == 2:
-			self.objs += 1
-
 class RewriteXml(object):
-	def __init__(self, outFi):
+	def __init__(self, outFi, TagLimitCallback = None, CurrentObjectWantedCheck = None, CurrentPosFunc = None):
 		self.parser = expat.ParserCreate()
 		self.parser.CharacterDataHandler = self.HandleCharData
 		self.parser.StartElementHandler = self.HandleStartElement
@@ -101,20 +79,24 @@ class RewriteXml(object):
 		self.maxDepth = 0
 		self.tags = []
 		self.attr = []
-		self.tagStarts = []
-		if isinstance(outFi, OutFileControl):
-			self.outFi = outFi
-		else:
-			self.outFi = OutFileControl(outFi)
-		self.pos = 0
+		self.outFi = outFi
 		self.parseOnly = 0
 		self.incremental = None
 
-		if self.outFi is not None:
+		self.TagLimitCallback = TagLimitCallback
+		self.CurrentObjectWantedCheck = CurrentObjectWantedCheck
+		self.CurrentPosFunc = CurrentPosFunc
+		self.tagLenAccum = 0
+
+		currentObjWanted = True
+		if self.CurrentObjectWantedCheck is not None:
+			currentObjWanted = self.CurrentObjectWantedCheck()
+
+		if self.outFi is not None and currentObjWanted:
 			wr = "<?xml version='1.0' encoding='UTF-8'?>\n"
 			self.outFi.write(wr)
-			self.pos += len(wr)
-		self.TagLimitCallback = None
+			if self.CurrentPosFunc is not None:
+				self.CurrentPosFunc(len(wr))
 
 	def ParseFile(self, fi):
 		fi.seek(0)
@@ -147,9 +129,15 @@ class RewriteXml(object):
 		self.maxDepth = self.depth
 		self.tags.append(name)
 		self.attr.append(attrs)
-		self.tagStarts.append(self.pos)
 
-		if not self.parseOnly:
+		if self.depth == 2:
+			self.tagLenAccum = 0
+
+		currentObjWanted = True
+		if self.CurrentObjectWantedCheck is not None:
+			currentObjWanted = self.CurrentObjectWantedCheck()
+
+		if not self.parseOnly and currentObjWanted:
 			strFrag = []
 			strFrag.append(unicode("<"+name))
 			for k in attrs:
@@ -158,28 +146,29 @@ class RewriteXml(object):
 			openTag = "".join(strFrag)
 
 			encodedOpenTag = openTag.encode("utf-8")
-			self.pos += len(encodedOpenTag)
+			self.tagLenAccum += len(encodedOpenTag)
 			if self.outFi is not None:
 				self.outFi.write(encodedOpenTag)
 
 	def HandleEndElement(self, name): 
 
-		if not self.parseOnly:
+		currentObjWanted = True
+		if self.CurrentObjectWantedCheck is not None:
+			currentObjWanted = self.CurrentObjectWantedCheck()
+
+		if not self.parseOnly and currentObjWanted:
 			closeTag = "</"+name+">\n"
 			closeTagEncoded = closeTag.encode("utf-8")
 
-			self.pos += len(closeTagEncoded)
+			self.tagLenAccum += len(closeTagEncoded)
 		
 			if self.outFi is not None:
 				self.outFi.write(closeTagEncoded)
 
-		if self.TagLimitCallback is not None:
-			self.TagLimitCallback(name, self.depth, self.attr[-1], self.tagStarts[-1], self.pos)
-
-		self.outFi.depthlimit(self.depth)
+		if self.TagLimitCallback is not None and self.depth==2:
+			self.TagLimitCallback(name, self.depth, self.attr[-1], self.tagLenAccum)
 
 		self.depth -= 1
 		self.tags.pop()
 		self.attr.pop()
-		self.tagStarts.pop()
 
