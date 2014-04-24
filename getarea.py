@@ -4,15 +4,15 @@ import slippy
 import xml.etree.ElementTree as ET
 
 class OsmObjectStore(object):
-	def __init__(self, fina="ukdump"):
+	def __init__(self, fina="dat"):
 
-		self.mainData = compressedfile.CompressedFile(fina, readOnly = True)
-		self.ns = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodestart.hash", readOnly = True), readOnly = True)
-		self.ne = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"nodeend.hash", readOnly = True), readOnly = True)
-		self.ws = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"waystart.hash", readOnly = True), readOnly = True)
-		self.we = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"wayend.hash", readOnly = True), readOnly = True)
-		self.rs = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"relationstart.hash", readOnly = True), readOnly = True)
-		self.re = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"relationend.hash", readOnly = True), readOnly = True)
+		self.mainData = compressedfile.CompressedFile(fina+"/data", readOnly = True)
+		self.ns = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"/datanodestart.hash", readOnly = True), readOnly = True)
+		self.ne = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"/datanodeend.hash", readOnly = True), readOnly = True)
+		self.ws = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"/datawaystart.hash", readOnly = True), readOnly = True)
+		self.we = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"/datawayend.hash", readOnly = True), readOnly = True)
+		self.rs = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"/datarelationstart.hash", readOnly = True), readOnly = True)
+		self.re = hashtable.HashTableFile(compressedfile.CompressedFile(fina+"/datarelationend.hash", readOnly = True), readOnly = True)
 
 	def Get(self, objType, objId, objVer):
 		startPos = None
@@ -32,6 +32,7 @@ class OsmObjectStore(object):
 		if startPos is None or endPos is None:
 			return None
 
+		print startPos, endPos, startPos-endPos
 		self.mainData.seek(startPos)
 		rawStr = self.mainData.read(endPos - startPos)
 		return rawStr.decode('utf-8')
@@ -61,7 +62,7 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore, 
 			if not spatialIndex.exists(tileFina):
 				continue
 			tileHits += 1
-			print tilex, tiley
+			print "Query tile", tilex, tiley
 			fi = spatialIndex.open(tileFina)
 			numNodeEntries = len(fi) / nodeEntry.size
 			for nodeNum in range(numNodeEntries):
@@ -77,10 +78,12 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore, 
 	if not tolerateMissing and tileHits != tileCount:
 		raise RuntimeError("Missing tiles detected")
 
+	print "Candidate nodes", len(candidateNodes)
 	print "Checking for latest versions"
 
 	#Check these are the latest known version of the node
 	currentNodes = {}
+	countMissingNodes = 0
 	for nodeId in candidateNodes:
 		try:
 			latestVer = versionStore.GetVersion("node", nodeId)
@@ -89,7 +92,10 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore, 
 			if latestVer == foundVer:
 				currentNodes[nodeId] = foundVer
 		except:
-			print "Missing node", nodeId
+			#print "Missing node", nodeId
+			countMissingNodes += 1
+
+	print "Missing nodes:", countMissingNodes
 
 	print "Num candidate nodes", len(currentNodes)
 
@@ -101,7 +107,13 @@ def GetNodesInCustomArea(spatialIndex, queryArea, osmObjectStore, versionStore, 
 		objStr = osmObjectStore.Get("node", nodeId, currentNodes[nodeId])
 		#print nodeId, "'"+objStr+"'"
 		#print len(objStr)
-		nodeXmlTree = ET.fromstring(objStr.encode("utf-8"))
+		try:
+			nodeXmlTree = ET.fromstring(objStr.encode("utf-8"))
+		except ET.ParseError as err:
+			print "Error getting", nodeId
+			print err
+			print objStr
+			raise err
 
 		lat = float(nodeXmlTree.attrib['lat'])
 		lon = float(nodeXmlTree.attrib['lon'])
@@ -187,10 +199,10 @@ def GetNodesInSlippyTile(spatialIndex, queryArea, osmObjectStore, versionStore, 
 	return nodeInfo
 
 class VersionStore(object):
-	def __init__(self):
-		self.nodeVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vnode", readOnly = True), readOnly = True)
-		self.wayVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vway", readOnly = True), readOnly = True)
-		self.relationVersions = hashtable.HashTableFile(compressedfile.CompressedFile("uk.vrelation", readOnly = True), readOnly = True)
+	def __init__(self, path="dat"):
+		self.nodeVersions = hashtable.HashTableFile(compressedfile.CompressedFile(path+"/ver.vnode", readOnly = True), readOnly = True)
+		self.wayVersions = hashtable.HashTableFile(compressedfile.CompressedFile(path+"/ver.vway", readOnly = True), readOnly = True)
+		self.relationVersions = hashtable.HashTableFile(compressedfile.CompressedFile(path+"/ver.vrelation", readOnly = True), readOnly = True)
 
 	def GetVersion(self, objType, objId):
 		if objType in ["n", "node"]:
@@ -203,10 +215,10 @@ class VersionStore(object):
 		raise RuntimeError("Unknown object type")
 
 class ParentsStore(object):
-	def __init__(self):
-		self.nodeParents = hashtable.HashTableFile(compressedfile.CompressedFile("child.node", readOnly = True), readOnly = True)
-		self.wayParents = hashtable.HashTableFile(compressedfile.CompressedFile("child.way", readOnly = True), readOnly = True)
-		self.relationParents = hashtable.HashTableFile(compressedfile.CompressedFile("child.relation", readOnly = True), readOnly = True)
+	def __init__(self, path="dat"):
+		self.nodeParents = hashtable.HashTableFile(compressedfile.CompressedFile(path+"/ch.node", readOnly = True), readOnly = True)
+		self.wayParents = hashtable.HashTableFile(compressedfile.CompressedFile(path+"/ch.way", readOnly = True), readOnly = True)
+		self.relationParents = hashtable.HashTableFile(compressedfile.CompressedFile(path+"/ch.relation", readOnly = True), readOnly = True)
 
 	def GetParents(self, objType, objId):
 
@@ -277,11 +289,11 @@ def GetDataForObjs(objsOfInterest, versionStore, osmObjectStore):
 				print "Missing", objType, objId, err
 
 class GetArea(object):
-	def __init__(self):
-		self.spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile("uk.spatial", readOnly = True))
-		self.osmObjectStore = OsmObjectStore("ukdump2")
-		self.versionStore = VersionStore()
-		self.parentsStore = ParentsStore()
+	def __init__(self, path="dat"):
+		self.spatialIndex = qsfs.Qsfs(compressedfile.CompressedFile(path+"/sp", readOnly = True))
+		self.osmObjectStore = OsmObjectStore(path)
+		self.versionStore = VersionStore(path)
+		self.parentsStore = ParentsStore(path)
 		self.currentParentStore = CurrentParentStore(self.versionStore, self.parentsStore)
 
 	def __del__(self):
@@ -439,5 +451,9 @@ if __name__=="__main__":
 	#getArea.GetArea([-0.5142975,51.2413932,-0.4645157,51.2738368], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
 	#getArea.GetTile(1021, 683, 11, bz2.BZ2File("out.osm.bz2", "w"))
 
-	MultiTileSave(getArea, [-9.4042969,49.3823728,2.7246094,62.8751884], 11)
+	#N mairana
+	#getArea.GetArea([145.6409693,15.0891509,145.8704831,15.297759], bz2.BZ2File("out.osm.bz2", "w")) #left,bottom,right,top
+	getArea.GetTile(1852, 936, 11, bz2.BZ2File("out.osm.bz2", "w"))
+
+	#MultiTileSave(getArea, [-9.4042969,49.3823728,2.7246094,62.8751884], 11)
 	

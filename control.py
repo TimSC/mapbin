@@ -57,7 +57,7 @@ class DataImport(object):
 					self.tagIndex.CurrentObjectWantedCheck, self.tagIndex.CurrentPosFunc)
 
 				self.tagIndex.objNumStart = self.projectState["dat-progress"]
-				self.tagIndex.objNumStartPos = self.projectState["dat-pos"]
+				#self.tagIndex.objNumStartPos = self.projectState["dat-pos"]
 				#self.parser.outFi.objNumStart = self.projectState["dat-progress"]
 				self.parser.StartIncremental(bz2.BZ2File(self.projectState["input"]))
 
@@ -77,7 +77,7 @@ class DataImport(object):
 
 		if self.tagIndex.objs > self.projectState["dat-progress"]:
 			self.projectState["dat-progress"] = self.tagIndex.objs
-			self.projectState["dat-pos"] = self.tagIndex.pos
+			#self.projectState["dat-pos"] = self.tagIndex.pos
 
 		print "Flushing index"
 		self.tagIndex.flush()
@@ -246,8 +246,8 @@ class MainWindow(QtGui.QMainWindow):
 			self.projectState["input"] = sys.argv[2]
 
 		if "input" not in self.projectState:
-			#self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
-			self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
+			self.projectState["input"] = "/home/tim/dev/pagesfile/northern_mariana_islands.osm.bz2"
+			#self.projectState["input"] = "/media/noraid/tim/earth-20130805062422.osm.bz2"
 			#self.projectState["input"] = "/media/noraid/tim/united_kingdom.osm.bz2"
 
 		self.dataImport = DataImport(self.projectState, self.workingFolder)

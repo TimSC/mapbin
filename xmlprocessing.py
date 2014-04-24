@@ -86,7 +86,7 @@ class RewriteXml(object):
 		self.TagLimitCallback = TagLimitCallback
 		self.CurrentObjectWantedCheck = CurrentObjectWantedCheck
 		self.CurrentPosFunc = CurrentPosFunc
-		self.tagLenAccum = 0
+		self.startPos = None
 
 		currentObjWanted = True
 		if self.CurrentObjectWantedCheck is not None:
@@ -130,12 +130,15 @@ class RewriteXml(object):
 		self.tags.append(name)
 		self.attr.append(attrs)
 
-		if self.depth == 2:
-			self.tagLenAccum = 0
-
 		currentObjWanted = True
 		if self.CurrentObjectWantedCheck is not None:
 			currentObjWanted = self.CurrentObjectWantedCheck()
+
+		if self.depth == 2 and currentObjWanted:
+			if self.outFi is not None:
+				self.startPos = self.outFi.tell()
+			else:
+				self.startPos = None
 
 		if not self.parseOnly and currentObjWanted:
 			strFrag = []
@@ -146,7 +149,7 @@ class RewriteXml(object):
 			openTag = "".join(strFrag)
 
 			encodedOpenTag = openTag.encode("utf-8")
-			self.tagLenAccum += len(encodedOpenTag)
+			#self.tagLenAccum += len(encodedOpenTag)
 			if self.outFi is not None:
 				self.outFi.write(encodedOpenTag)
 
@@ -160,13 +163,19 @@ class RewriteXml(object):
 			closeTag = "</"+name+">\n"
 			closeTagEncoded = closeTag.encode("utf-8")
 
-			self.tagLenAccum += len(closeTagEncoded)
+			#self.tagLenAccum += len(closeTagEncoded)
 		
 			if self.outFi is not None:
 				self.outFi.write(closeTagEncoded)
 
 		if self.TagLimitCallback is not None and self.depth==2:
-			self.TagLimitCallback(name, self.depth, self.attr[-1], self.tagLenAccum)
+			posNow = None
+			if self.depth == 2 and currentObjWanted:
+				if self.outFi is not None:
+					posNow = self.outFi.tell()
+
+			self.TagLimitCallback(name, self.depth, self.attr[-1], self.startPos, posNow)
+			self.startPos = None
 
 		self.depth -= 1
 		self.tags.pop()

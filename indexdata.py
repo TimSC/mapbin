@@ -33,7 +33,6 @@ class TagIndex(object):
 		self.lastDisplayTime = time.time()
 		self.lastDisplayCount = 0
 		self.outFina = outFina
-		self.pos = 0
 
 		self.objNumStart = None
 		self.objNumStartPos = 0
@@ -95,16 +94,11 @@ class TagIndex(object):
 		del self.relationEndTable
 
 	def CurrentPosFunc(self, currentPos):
-		self.pos = currentPos
-		print "CurrentPosFunc", currentPos
+		pass
 
-	def TagLimitCallback(self, name, depth, attr, length):
+	def TagLimitCallback(self, name, depth, attr, start, end):
 		if depth != 2:
 			return
-
-		if self.objs == self.objNumStart:
-			#Resume position in file
-			self.pos = self.objNumStartPos
 
 		if time.time() - self.lastDisplayTime > 1.:
 			rate = (self.objs - self.lastDisplayCount) / (time.time() - self.lastDisplayTime)
@@ -131,11 +125,11 @@ class TagIndex(object):
 			else:
 				tmpEnd = {}
 
-			tmpStart[objVersion] = self.pos
-			tmpEnd[objVersion] = self.pos + length
+			tmpStart[objVersion] = start
+			tmpEnd[objVersion] = end
 
-			self.nodeStartTable[objId] = tmpStart
-			self.nodeEndTable[objId] = tmpEnd
+			self.nodeStartTable[objId] = start
+			self.nodeEndTable[objId] = end
 
 		if doInsert and name == "way":
 			objId = int(attr['id'])
@@ -150,8 +144,8 @@ class TagIndex(object):
 			else:
 				tmpEnd = {}
 
-			tmpStart[objVersion] = self.pos
-			tmpEnd[objVersion] = self.pos + length
+			tmpStart[objVersion] = start
+			tmpEnd[objVersion] = end
 
 			self.wayStartTable[objId] = tmpStart
 			self.wayEndTable[objId] = tmpEnd
@@ -169,8 +163,8 @@ class TagIndex(object):
 			else:
 				tmpEnd = {}
 
-			tmpStart[objVersion] = self.pos
-			tmpEnd[objVersion] = self.pos + length
+			tmpStart[objVersion] = start
+			tmpEnd[objVersion] = end
 
 			self.relationStartTable[objId] = tmpStart
 			self.relationEndTable[objId] = tmpEnd
@@ -183,7 +177,6 @@ class TagIndex(object):
 			self.relations += 1
 
 		self.objs += 1
-		self.pos += length
 
 	def CurrentObjectWantedCheck(self):
 		doInsert = True
