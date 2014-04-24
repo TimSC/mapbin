@@ -141,6 +141,8 @@ class MultiImport(object):
 
 	def __del__(self):
 		self.Pause()
+		if self.tagIndex is not None:
+			self.tagIndex.flush()
 
 		self.parser = None
 		self.outfi = None

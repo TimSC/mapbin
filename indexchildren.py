@@ -13,7 +13,7 @@ def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 	except:
 		pass
 
-	compfile = compressedfile.CompressedFile(fina, createFile = False)
+	compfile = compressedfile.CompressedFile(fina, createFile = True)
 	compfile.maxCachePages = maxCachedPages
 	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000, createFile = True)
 	return table, compfile
@@ -49,6 +49,10 @@ class TagIndex(object):
 
 	def __del__(self):
 		print "Flushing"
+		self.flush()
+		self.nodeParentStore, self.compFiN = None, None
+		self.wayParentStore, self.compFiW = None, None
+		self.relationParentStore, self.compFiR = None, None
 
 	def AddParent(self, childType, childRef, parentType, parentRef, parentVer):
 		#print childType, childRef, parentType, parentRef
@@ -136,9 +140,12 @@ class TagIndex(object):
 		self.objs += 1
 
 	def flush(self):
-			self.nodeParentStore.flush()
-			self.wayParentStore.flush()
-			self.relationParentStore.flush()
+		self.nodeParentStore.flush()
+		self.wayParentStore.flush()
+		self.relationParentStore.flush()
+		self.compFiN.flush()
+		self.compFiW.flush()
+		self.compFiR.flush()
 
 if __name__ == "__main__":
 	if len(sys.argv) < 2:

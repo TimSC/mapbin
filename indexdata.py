@@ -20,7 +20,7 @@ def StoreFactoryRead(fina, maxCachedPages = 50):
 
 	compfile = compressedfile.CompressedFile(fina)
 	compfile.maxCachePages = maxCachedPages
-	table = hashtable.HashTableFile(compfile, None, 0, 1, 1, 10000)
+	table = hashtable.HashTableFile(compfile, None, 0, 1, 1, 10000, createFile=False)
 	return table, compfile
 
 class TagIndex(object):

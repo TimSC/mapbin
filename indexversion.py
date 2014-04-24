@@ -4,14 +4,6 @@ from pycontainers import compressedfile, hashtable
 
 #UK dump size nodes=33017987 ways=4040979 relations=80851
 
-'''
-909564674 0 0 909564674 (7293.01967449 obj per sec)
-909573646 0 0 909573646 (3046.25250888 obj per sec)
-909579209 0 0 909579209 (1615.85987306 obj per sec)
-909582492 0 0 909582492 (1289.37901969 obj per sec)
-version index import failed Error -3 while decompressing data: incorrect data check
-'''
-
 def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 	try:
 		os.unlink(fina)
@@ -24,14 +16,9 @@ def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 	return table, compfile
 
 def StoreFactoryOpen(fina, maskBits = 26, maxCachedPages = 50):
-	try:
-		os.unlink(fina)
-	except:
-		pass
-
 	compfile = compressedfile.CompressedFile(fina, createFile = False)
 	compfile.maxCachePages = maxCachedPages
-	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000, createFile = False)
+	table = hashtable.HashTableFile(compfile, None, 0, 1, 1, 10000, createFile = False)
 	return table, compfile
 
 class TagIndex(object):
@@ -58,13 +45,18 @@ class TagIndex(object):
 			self.relationParentStore, self.compFiR = StoreFactoryOpen(self.prefix+".vrelation", 22, 50)
 
 	def __del__(self):
-		print "Flushing"
 		self.flush()
+		self.nodeParentStore, self.compFiN = None, None
+		self.wayParentStore, self.compFiW = None, None
+		self.relationParentStore, self.compFiR = None, None
 
 	def flush(self):
 		self.nodeParentStore.flush()
 		self.wayParentStore.flush()
 		self.relationParentStore.flush()
+		self.compFiN.flush()
+		self.compFiW.flush()
+		self.compFiR.flush()
 
 	def TagLimitCallback(self, name, depth, attr, childTags, childMembers):
 		if depth != 2:
@@ -76,13 +68,11 @@ class TagIndex(object):
 			self.lastDisplayTime = time.time()
 			print self.nodes, self.ways, self.relations, self.objs, "("+str(rate)+" obj per sec)"
 
-
 		doInsert = True
 		if self.objNumStart is not None and self.objNumStart > self.objs:
 			doInsert = False
 		if self.objNumEnd is not None and self.objNumEnd < self.objs:
 			doInsert = False
-
 
 		if name == "node":
 			if doInsert:
