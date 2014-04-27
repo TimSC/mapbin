@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
 	infi = bz2.BZ2File(sys.argv[1])
 
-	tagIndex = TagIndex(sys.argv[2], True)
+	tagIndex = TagIndex(sys.argv[2]+"/ch", True)
 
 	parser = xmlprocessing.ReadXml()
 	parser.TagLimitCallback = tagIndex.TagLimitCallback

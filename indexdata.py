@@ -11,9 +11,9 @@ def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 	except:
 		pass
 
-	compfile = compressedfile.CompressedFile(fina)
+	compfile = compressedfile.CompressedFile(fina, createFile=True)
 	compfile.maxCachePages = maxCachedPages
-	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000)
+	table = hashtable.HashTableFile(compfile, maskBits, 1, 1, 1, 10000, createFile=True)
 	return table, compfile
 
 def StoreFactoryRead(fina, maxCachedPages = 50):
@@ -210,9 +210,9 @@ if __name__ == "__main__":
 		os.unlink(sys.argv[2])
 	except:
 		pass
-	outfi = compressedfile.CompressedFile(sys.argv[2])
+	outfi = compressedfile.CompressedFile(sys.argv[2]+"/data", createFile = True)
 
-	tagIndex = TagIndex(sys.argv[2])
+	tagIndex = TagIndex(sys.argv[2]+"/")
 
 	parser = xmlprocessing.RewriteXml(outfi, tagIndex.TagLimitCallback, tagIndex.CurrentObjectWantedCheck, tagIndex.CurrentPosFunc)
 	parser.ParseFile(infi)

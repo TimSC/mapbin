@@ -13,8 +13,8 @@ def StoreFactoryCreate(fina):
 
 	outFileSystem = qsfs.Qsfs(compressedfile.CompressedFile(fina, createFile=True), initFs = 1, 
 		deviceSize = 1024 * 1024 * 1024 * 1024, #1Tb
-		maxFileSize = 20 * 1024 * 1024,
-		blockSize = 100 * 1024,
+		maxFileSize = 200 * 1024 * 1024,
+		blockSize = 1024 * 1024,
 		maxFiles = 5000000)
 	print outFileSystem.statvfs("/")
 
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 		exit(1)
 
 	infi = bz2.BZ2File(sys.argv[1])
-	tagIndex = TagIndex(sys.argv[2])
+	tagIndex = TagIndex(sys.argv[2]+"/sp")
 
 	parser = xmlprocessing.ReadXml()
 	parser.TagLimitCallback = tagIndex.TagLimitCallback

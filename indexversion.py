@@ -4,6 +4,11 @@ from pycontainers import compressedfile, hashtable
 
 #UK dump size nodes=33017987 ways=4040979 relations=80851
 
+#846992971 0 0 846992971 (413.965408005 obj per sec)
+#846994360 0 0 846994360 (582.692836271 obj per sec)
+#846994873 0 0 846994873 (213.175584096 obj per sec)
+#fail...
+
 def StoreFactoryCreate(fina, maskBits = 26, maxCachedPages = 50):
 	try:
 		os.unlink(fina)
@@ -127,7 +132,7 @@ if __name__ == "__main__":
 
 	infi = bz2.BZ2File(sys.argv[1])
 
-	tagIndex = TagIndex(sys.argv[2])
+	tagIndex = TagIndex(sys.argv[2]+"/ver")
 
 	parser = xmlprocessing.ReadXml()
 	parser.TagLimitCallback = tagIndex.TagLimitCallback
