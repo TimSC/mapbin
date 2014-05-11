@@ -19,7 +19,7 @@ def StoreFactoryCreate(fina):
 	print outFileSystem.statvfs("/")
 
 	tileStorage = TileStorage(outFileSystem)
-	return tileStorage
+	return tileStorage, outFileSystem
 
 def StoreFactoryOpen(fina):
 
@@ -27,7 +27,7 @@ def StoreFactoryOpen(fina):
 	print outFileSystem.statvfs("/")
 
 	tileStorage = TileStorage(outFileSystem)
-	return tileStorage
+	return tileStorage, outFileSystem
 
 class TileStorage(object):
 	def __init__(self, outFileSystem):
@@ -111,9 +111,9 @@ class TagIndex(object):
 		self.objNumEnd = None
 
 		if createFile:
-			self.outfi = StoreFactoryCreate(fina)
+			self.outfi, self.outFileSystem = StoreFactoryCreate(fina)
 		else:
-			self.outfi = StoreFactoryOpen(fina)
+			self.outfi, self.outFileSystem = StoreFactoryOpen(fina)
 
 	def __del__(self):
 		print "Flushing"
@@ -121,6 +121,7 @@ class TagIndex(object):
 
 	def flush(self):
 		self.outfi.flush()
+		self.outFileSystem.flush()
 
 	def TagLimitCallback(self, name, depth, attr, childTags, childMembers):
 		if depth != 2:
@@ -179,8 +180,8 @@ if __name__ == "__main__":
 
 	print tagIndex.nodes, tagIndex.ways, tagIndex.relations, tagIndex.objs
 
+	tagIndex.flush()
 	del tagIndex
 	del parser
-	outFileSystem.flush()
 	print "All done"
 
